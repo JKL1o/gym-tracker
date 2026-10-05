@@ -18,9 +18,9 @@ export const EXERCISES = {
   sprint_20:            { name: 'Sprint 20 m',                   load: 'none', unit: 'Wdh', note: 'im Fußballtraining' },
   preacher_curls:       { name: 'Preacher Curls',                load: 'kg',   unit: 'Wdh' },
   trizeps_seilzug:      { name: 'Trizeps Seilzug',               load: 'kg',   unit: 'Wdh' },
-  hammer_curls:         { name: 'Hammer Curls',                  load: 'kg',   unit: 'Wdh' },
+  hammer_curls:         { name: 'Hammer Curls',                  load: 'kg2',  unit: 'Wdh' },
   overhead_extensions:  { name: 'Overhead Extensions',           load: 'kg',   unit: 'Wdh' },
-  curls_sitzen:         { name: 'Curls im Sitzen',               load: 'kg',   unit: 'Wdh' },
+  curls_sitzen:         { name: 'Curls im Sitzen',               load: 'kg2',  unit: 'Wdh' },
   farmers_walk:         { name: 'Farmer’s Walk',                 load: 'kg2',  unit: 'm' },
   pallof_press:         { name: 'Pallof Press',                  load: 'kg',   unit: 'Wdh', perSide: true },
   side_plank:           { name: 'Side Plank mit Hüftheben',      load: 'bw',   unit: 'Wdh', perSide: true },
@@ -30,12 +30,12 @@ export const EXERCISES = {
   brustpresse:          { name: 'Brustpresse',                   load: 'kg',   unit: 'Wdh' },
   lat_pulldown_eng:     { name: 'Lat Pulldown, enger Griff',     load: 'kg',   unit: 'Wdh' },
   schraegbank_maschine: { name: 'Schrägbankdrücken Maschine',    load: 'kg',   unit: 'Wdh' },
-  seitheben:            { name: 'Seitheben',                     load: 'kg',   unit: 'Wdh' },
+  seitheben:            { name: 'Seitheben',                     load: 'kg2',  unit: 'Wdh' },
   reverse_butterfly:    { name: 'Reverse Butterfly',             load: 'kg',   unit: 'Wdh' },
   broad_jump:           { name: 'Broad Jump',                    load: 'none', unit: 'Wdh' },
   box_jump:             { name: 'Box Jump',                      load: 'none', unit: 'Wdh' },
   kniebeuge:            { name: 'Kniebeuge',                     load: 'kg',   unit: 'Wdh' },
-  bulgarian_split:      { name: 'Bulgarian Split Squat',         load: 'kg',   unit: 'Wdh', perSide: true },
+  bulgarian_split:      { name: 'Bulgarian Split Squat',         load: 'kg2',  unit: 'Wdh', perSide: true },
   romanian_deadlift:    { name: 'Romanian Deadlift',             load: 'kg',   unit: 'Wdh' },
   back_extension:       { name: 'Back Extension 45°',            load: 'kg',   unit: 'Wdh' },
   nordic_curl:          { name: 'Nordic Curl',                   load: 'none', unit: 'Wdh', note: 'mit Band' },
@@ -44,6 +44,8 @@ export const EXERCISES = {
 
 // Einheiten mit Planwerten. Texte (kg, Sätze, Wdh., Pause) 1:1 aus Gym.md;
 // estimate = im Plan mit * markiert ("Schätzwert – beim ersten Mal messen").
+// Abweichung von Gym.md: Hammer Curls, Curls im Sitzen, Seitheben, Bulgarian Split Squat
+// sind laut Jalil pro Hand gemeint und daher als "2 × … kg" geführt.
 export const SESSIONS = {
   oka: {
     name: 'Oberkörper A',
@@ -63,9 +65,9 @@ export const SESSIONS = {
       { ex: 'dips',                kg: 'KG',         sets: '3', reps: '8–12',        pause: '90 s' },
       { ex: 'preacher_curls',      kg: '37,5 kg',    sets: '4', reps: '8–12',        pause: '90 s' },
       { ex: 'trizeps_seilzug',     kg: '21,25 kg',   sets: '4', reps: '10–15',       pause: '90 s' },
-      { ex: 'hammer_curls',        kg: '16 kg',      sets: '3', reps: '8–12',        pause: '60 s' },
+      { ex: 'hammer_curls',        kg: '2 × 16 kg',     sets: '3', reps: '8–12',        pause: '60 s' },
       { ex: 'overhead_extensions', kg: '17,5 kg',    sets: '3', reps: '10–15',       pause: '60 s' },
-      { ex: 'curls_sitzen',        kg: '12 kg',      sets: '3', reps: '10–12',       pause: '60 s' },
+      { ex: 'curls_sitzen',        kg: '2 × 12 kg',    sets: '3', reps: '10–12',       pause: '60 s' },
       { ex: 'farmers_walk',        kg: '2 × 15 kg',  sets: '3', reps: '40 m',        pause: '60 s' },
       { ex: 'pallof_press',        kg: '10 kg',      sets: '3', reps: '12 / Seite',  pause: '60 s', estimate: true },
       { ex: 'side_plank',          kg: 'KG',         sets: '3', reps: '10 / Seite',  pause: '45 s' },
@@ -80,7 +82,7 @@ export const SESSIONS = {
       { ex: 'brustpresse',          kg: '40 kg',  sets: '1 + 3', reps: '8–12',  pause: '2 min' },
       { ex: 'lat_pulldown_eng',     kg: '70 kg',  sets: '3',     reps: '10–12', pause: '90 s' },
       { ex: 'schraegbank_maschine', kg: '50 kg',  sets: '3',     reps: '8–12',  pause: '90 s' },
-      { ex: 'seitheben',            kg: '8 kg',   sets: '3',     reps: '12–15', pause: '60 s' },
+      { ex: 'seitheben',            kg: '2 × 8 kg', sets: '3',     reps: '12–15', pause: '60 s' },
       { ex: 'reverse_butterfly',    kg: '54 kg',  sets: '3',     reps: '12–15', pause: '60 s' },
     ],
   },
@@ -91,7 +93,7 @@ export const SESSIONS = {
       { ex: 'broad_jump',           kg: '—',     sets: '3', reps: '3',          pause: '2 min' },
       { ex: 'box_jump',             kg: '—',     sets: '3', reps: '3',          pause: '2 min' },
       { ex: 'kniebeuge',            kg: '40 kg', sets: '4', reps: '6–8',        pause: '3 min' },
-      { ex: 'bulgarian_split',      kg: '10 kg', sets: '3', reps: '8 / Bein',   pause: '90 s' },
+      { ex: 'bulgarian_split',      kg: '2 × 10 kg', sets: '3', reps: '8 / Bein',   pause: '90 s' },
       { ex: 'romanian_deadlift',    kg: '40 kg', sets: '3', reps: '8',          pause: '2 min' },
       { ex: 'back_extension',       kg: '15 kg', sets: '3', reps: '12–15',      pause: '90 s' },
       { ex: 'nordic_curl',          kg: 'Band',  sets: '2', reps: '5',          pause: '2 min' },
