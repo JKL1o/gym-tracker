@@ -193,6 +193,7 @@ nav#tabs button.active { color: var(--accent); }
 .field input {
   margin-top: 3px;
   padding: 10px;
+  height: 44px; /* gleich hoch, auch Datumsfelder */
   font-size: 1rem; /* ab 16px zoomt iOS beim Antippen nicht hinein */
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -247,3 +248,38 @@ nav#tabs button.active { color: var(--accent); }
 /* ---------- Daten ---------- */
 .stats { display: flex; gap: 24px; margin: 14px 0 16px; }
 .stat-num { font-size: 1.6rem; font-weight: 700; }
+
+/* ---------- Abschnitte, Fußball, Körpergewicht ---------- */
+.section-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 20px 0 8px; }
+.card .section-label { margin-top: 18px; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.card-head .card-title { margin-bottom: 0; }
+
+.options { display: flex; gap: 8px; }
+.option {
+  flex: 1;
+  padding: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  font-weight: 600;
+  cursor: pointer;
+}
+.option.selected { border-color: var(--done); background: var(--done-soft); color: var(--done); }
+.inline-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 10px; }
+.inline-form .btn-primary { flex-shrink: 0; }
+.saved-note { margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
+.top-gap { margin-top: 14px; }
+.error:not(:empty) { margin-top: 8px; }
+
+.big-value { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 2px; }
+.delta { font-size: 0.85rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #f3f4f6; color: var(--muted); }
+.delta.up { background: var(--done-soft); color: var(--done); }
+.delta.down { background: #fef2f2; color: var(--error); }
+
+.history-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 0.95rem; }
+.history-row span:first-child { flex: 1; }
+.history-kg { font-weight: 600; }
+.muted-link { color: var(--faint); font-size: 0.8rem; }
+.small-num { font-size: 1.25rem; }
+.gap { height: 8px; }

@@ -106,3 +106,52 @@ export function removeGymEntry(entries, date, exerciseId) {
 export function sessionForDay({ date, planned, override, entries }) {
   return override ?? entries.find((e) => e.type === 'gym' && e.date === date)?.session ?? planned ?? null;
 }
+
+// ---------- Fußball und Körpergewicht: ein Eintrag pro Tag ----------
+
+// Speichern oder den Eintrag gleicher Art am selben Tag ersetzen.
+export function upsertDayEntry(entries, entry, now, newId) {
+  const index = entries.findIndex((e) => e.type === entry.type && e.date === entry.date);
+  if (index === -1) return [...entries, { ...entry, id: newId, createdAt: now }];
+  const old = entries[index];
+  const updated = { ...entry, id: old.id, createdAt: old.createdAt, updatedAt: now };
+  return entries.map((e, i) => (i === index ? updated : e));
+}
+
+export function removeDayEntry(entries, type, date) {
+  return entries.filter((e) => !(e.type === type && e.date === date));
+}
+
+// Fußball: kind 'training' oder 'match'; bei Match Spielminuten (0–150, inkl. Verlängerung)
+export function validateFootball(entry) {
+  const errors = [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date ?? '')) errors.push('Datum fehlt');
+  if (entry.kind === 'match') {
+    if (!Number.isInteger(entry.minutes) || entry.minutes < 0 || entry.minutes > 150) errors.push('Spielminuten: ganze Zahl von 0 bis 150');
+  } else if (entry.kind === 'training') {
+    if (entry.minutes !== null) errors.push('Training hat keine Spielminuten');
+  } else {
+    errors.push('Training oder Match wählen');
+  }
+  return errors;
+}
+
+// Körpergewicht in kg (30–200, mit Kommastellen)
+export function validateBodyweight(entry) {
+  const errors = [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date ?? '')) errors.push('Datum fehlt');
+  if (!(entry.kg >= 30 && entry.kg <= 200)) errors.push('Gewicht: Zahl zwischen 30 und 200 kg');
+  return errors;
+}
+
+// Messungen nach Datum, neueste zuerst
+export function bodyweightHistory(entries) {
+  return entries.filter((e) => e.type === 'bodyweight').sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// Veränderung der neuesten Messung zur vorherigen (auf 0,1 kg gerundet), null wenn < 2 Messungen
+export function bodyweightChange(entries) {
+  const [latest, previous] = bodyweightHistory(entries);
+  if (!latest || !previous) return null;
+  return Math.round((latest.kg - previous.kg) * 10) / 10;
+}

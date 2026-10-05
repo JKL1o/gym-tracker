@@ -2,7 +2,10 @@
 // Semikolon als Trennzeichen, Dezimalkomma, UTF-8 mit BOM (sonst zeigt Excel Umlaute falsch).
 import { EXERCISES, SESSIONS } from './plan.js';
 
-const COLUMNS = ['datum', 'art', 'einheit', 'uebung', 'saetze', 'wiederholungen', 'wdh_einheit', 'gewicht_kg', 'gewicht_art'];
+const COLUMNS = [
+  'datum', 'art', 'einheit', 'uebung', 'saetze', 'wiederholungen', 'wdh_einheit', 'gewicht_kg', 'gewicht_art',
+  'fussball', 'spielminuten', 'koerpergewicht_kg',
+];
 const WEIGHT_TYPE = { kg: 'gesamt', kg2: 'pro Hand', bw: 'Zusatzgewicht', none: 'ohne' };
 const REPS_UNIT = { Wdh: 'Wdh', m: 'm', s: 's' };
 
@@ -18,13 +21,21 @@ function gymRow(e) {
   return [
     e.date, 'gym', SESSIONS[e.session]?.name ?? e.session, ex?.name ?? e.exercise,
     e.sets, e.reps, ex ? REPS_UNIT[ex.unit] + (ex.perSide ? ' / Seite' : '') : '',
-    e.weight, ex ? WEIGHT_TYPE[ex.load] : '',
+    e.weight, ex ? WEIGHT_TYPE[ex.load] : '', '', '', '',
   ];
+}
+
+// Fußball und Körpergewicht: Gym-Spalten bleiben leer
+function otherRow(e) {
+  const empty = ['', '', '', '', '', '', ''];
+  if (e.type === 'football') return [e.date, 'fussball', ...empty, e.kind, e.minutes, ''];
+  if (e.type === 'bodyweight') return [e.date, 'koerpergewicht', ...empty, '', '', e.kg];
+  return [e.date, e.type];
 }
 
 // Alle Einträge → CSV-Text, nach Datum sortiert (ohne BOM; das hängt der Download davor)
 export function toCSV(entries) {
   const sorted = [...entries].sort((a, b) => (a.date + (a.createdAt ?? '')).localeCompare(b.date + (b.createdAt ?? '')));
-  const rows = sorted.map((e) => (e.type === 'gym' ? gymRow(e) : [e.date, e.type]));
+  const rows = sorted.map((e) => (e.type === 'gym' ? gymRow(e) : otherRow(e)));
   return [COLUMNS, ...rows].map((row) => row.map(cell).join(';')).join('\r\n') + '\r\n';
 }

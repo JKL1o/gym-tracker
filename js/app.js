@@ -1,7 +1,10 @@
 // Oberfläche: Training eintragen, Wochenplan, Daten-Export.
 import { EXERCISES, SESSIONS, plannedWeek, mondayOf, toISODate } from './plan.js';
-import { defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay } from './entries.js';
-import { loadEntries, saveGymEntry, deleteGymEntry } from './store.js';
+import {
+  defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay,
+  validateFootball, validateBodyweight, bodyweightHistory, bodyweightChange,
+} from './entries.js';
+import { loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry } from './store.js';
 import { toCSV } from './export.js';
 
 const view = document.getElementById('view');
@@ -13,6 +16,7 @@ const state = {
   choosing: false,    // Einheiten-Auswahl offen
   editing: null,      // Übung, deren Felder gerade aufgeklappt sind
   openDay: null,      // im Wochenplan aufgeklappter Tag
+  matchPending: null, // Datum, an dem "Match" angetippt, aber noch nicht gespeichert ist
 };
 
 const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -44,6 +48,12 @@ function parseISO(iso) {
 function shortDate(iso) {
   const d = parseISO(iso);
   return `${d.getDate()}. ${MONTHS[d.getMonth()].slice(0, 3)}.`;
+}
+
+// "2026-10-05" → "5. Oktober"
+function longDate(iso) {
+  const d = parseISO(iso);
+  return `${d.getDate()}. ${MONTHS[d.getMonth()]}`;
 }
 
 // Wochenplan der Woche, in der `iso` liegt. Immer die normale Woche (Match Freitag) –
@@ -175,6 +185,64 @@ function sessionChooser(day) {
   );
 }
 
+// Fußball an diesem Tag: Training oder Match (mit Spielminuten). Nochmal tippen entfernt.
+function footballCard(day, entries) {
+  const entry = entries.find((e) => e.type === 'football' && e.date === state.date);
+  const matchOpen = entry?.kind === 'match' || state.matchPending === state.date;
+  const planned = { training: 'laut Plan: Training', match: 'laut Plan: Match' }[day.football] ?? null;
+
+  function tapTraining() {
+    if (entry?.kind === 'training') deleteDayEntry('football', state.date);
+    else saveDayEntry({ type: 'football', date: state.date, kind: 'training', minutes: null });
+    state.matchPending = null;
+    render();
+  }
+
+  function tapMatch() {
+    if (entry?.kind === 'match' || state.matchPending === state.date) {
+      if (entry?.kind === 'match') deleteDayEntry('football', state.date);
+      state.matchPending = null;
+    } else {
+      state.matchPending = state.date; // erst Spielminuten eingeben, dann speichern
+    }
+    render();
+  }
+
+  const minutes = h('input', { type: 'text', inputmode: 'numeric', value: entry?.kind === 'match' ? entry.minutes : '', placeholder: 'z. B. 70' });
+  const message = h('div', { class: 'error' });
+
+  function saveMatch() {
+    const newEntry = { type: 'football', date: state.date, kind: 'match', minutes: parseNumber(minutes.value) };
+    const errors = validateFootball(newEntry);
+    if (errors.length) {
+      message.textContent = errors.join(' · ');
+      return;
+    }
+    saveDayEntry(newEntry);
+    state.matchPending = null;
+    render();
+  }
+
+  return h('div', { class: 'card' },
+    h('div', { class: 'card-head' },
+      h('span', { class: 'card-title' }, 'Fußball'),
+      planned ? h('span', { class: 'muted' }, planned) : null,
+    ),
+    h('div', { class: 'options' },
+      h('button', { class: `option${entry?.kind === 'training' ? ' selected' : ''}`, onclick: tapTraining }, 'Training'),
+      h('button', { class: `option${matchOpen ? ' selected' : ''}`, onclick: tapMatch }, 'Match'),
+    ),
+    matchOpen ? h('div', { class: 'inline-form' },
+      h('label', { class: 'field' }, h('span', {}, 'Spielminuten'), minutes),
+      h('button', { class: 'btn-primary', onclick: saveMatch }, entry?.kind === 'match' ? 'Ändern' : 'Speichern'),
+    ) : null,
+    message,
+    entry ? h('div', { class: 'saved-note' },
+      entry.kind === 'match' ? `Match gespeichert · ${entry.minutes} Min.` : 'Training gespeichert',
+      ' · nochmal tippen zum Entfernen') : null,
+  );
+}
+
 function renderTraining() {
   const week = weekOf(state.date);
   const entries = loadEntries();
@@ -185,7 +253,7 @@ function renderTraining() {
 
   // Tagesleiste Mo–So; Punkt = Gym geplant, grün = etwas eingetragen
   const strip = h('div', { class: 'day-strip' }, week.days.map((d) => {
-    const logged = entries.some((e) => e.type === 'gym' && e.date === d.date);
+    const logged = entries.some((e) => (e.type === 'gym' || e.type === 'football') && e.date === d.date);
     const cls = ['day', d.date === state.date && 'selected', d.date === TODAY && 'today'].filter(Boolean).join(' ');
     return h('button', {
       class: cls,
@@ -228,6 +296,7 @@ function renderTraining() {
       h('button', { class: 'btn-text center', onclick: () => { state.choosing = true; render(); } }, 'Andere Einheit wählen'),
     );
   }
+  parts.push(h('div', { class: 'gap' }), footballCard(day, entries));
   return parts;
 }
 
@@ -270,8 +339,8 @@ function renderWeek() {
 // ---------- Daten ----------
 
 function downloadCSV(entries) {
-  // ﻿ (BOM) am Anfang, damit Excel die Datei als UTF-8 erkennt
-  const blob = new Blob(['﻿' + toCSV(entries)], { type: 'text/csv;charset=utf-8' });
+  // \uFEFF (BOM) am Anfang, damit Excel die Datei als UTF-8 erkennt
+  const blob = new Blob(['\uFEFF' + toCSV(entries)], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = h('a', { href: url, download: `gym-tracker-${TODAY}.csv` });
   document.body.append(a);
@@ -280,20 +349,72 @@ function downloadCSV(entries) {
   URL.revokeObjectURL(url);
 }
 
+function bodyweightCard(entries) {
+  const history = bodyweightHistory(entries);
+  const latest = history[0];
+  const change = bodyweightChange(entries);
+
+  const dateInput = h('input', { type: 'date', value: TODAY, max: TODAY });
+  const kgInput = h('input', { type: 'text', inputmode: 'decimal', placeholder: latest ? formatNumber(latest.kg) : 'z. B. 68,5' });
+  const message = h('div', { class: 'error' });
+
+  function save() {
+    const entry = { type: 'bodyweight', date: dateInput.value, kg: parseNumber(kgInput.value) };
+    const errors = validateBodyweight(entry);
+    if (errors.length) {
+      message.textContent = errors.join(' · ');
+      return;
+    }
+    saveDayEntry(entry); // gleicher Tag nochmal = Wert wird ersetzt
+    render();
+  }
+
+  // Ziel Zunehmen: Plus grün, Minus rot
+  const delta = change === null ? null : h('span', {
+    class: `delta${change > 0 ? ' up' : change < 0 ? ' down' : ''}`,
+  }, `${change > 0 ? '+' : ''}${formatNumber(change)} kg`);
+
+  return h('div', { class: 'card' },
+    h('div', { class: 'card-title' }, 'Körpergewicht'),
+    latest
+      ? [
+        h('div', { class: 'big-value' }, h('span', { class: 'stat-num' }, `${formatNumber(latest.kg)} kg`), delta),
+        h('div', { class: 'muted' }, `Zuletzt gemessen am ${longDate(latest.date)}`,
+          change === null ? '' : ' · Veränderung zur Messung davor'),
+      ]
+      : h('p', { class: 'muted' }, 'Noch keine Messung eingetragen.'),
+    h('div', { class: 'fields top-gap' },
+      h('label', { class: 'field' }, h('span', {}, 'Datum'), dateInput),
+      h('label', { class: 'field' }, h('span', {}, 'Gewicht in kg'), kgInput),
+    ),
+    message,
+    h('button', { class: 'btn-primary full', onclick: save }, 'Gewicht speichern'),
+    history.length ? [
+      h('div', { class: 'section-label' }, 'Verlauf'),
+      h('div', { class: 'history' }, history.slice(0, 10).map((e) => h('div', { class: 'history-row' },
+        h('span', {}, longDate(e.date)),
+        h('span', { class: 'history-kg' }, `${formatNumber(e.kg)} kg`),
+        h('button', { class: 'btn-text muted-link', onclick: () => { deleteDayEntry('bodyweight', e.date); render(); } }, 'Entfernen'),
+      ))),
+    ] : null,
+  );
+}
+
 function renderData() {
   const entries = loadEntries();
-  const gymCount = entries.filter((e) => e.type === 'gym').length;
-  const days = new Set(entries.map((e) => e.date)).size;
+  const count = (type) => entries.filter((e) => e.type === type).length;
   return [
     h('h1', { class: 'page-title' }, 'Daten'),
+    bodyweightCard(entries),
     h('div', { class: 'card' },
       h('div', { class: 'card-title' }, 'Export'),
-      h('p', { class: 'muted' }, 'Alle Einträge als CSV-Datei. Öffnet sich in Excel und dient als Sicherung.'),
+      h('p', { class: 'muted' }, 'Alle Einträge als CSV-Datei – öffnet sich in Excel und dient als Sicherung.'),
       h('div', { class: 'stats' },
-        h('div', {}, h('div', { class: 'stat-num' }, gymCount), h('div', { class: 'muted' }, 'Übungen eingetragen')),
-        h('div', {}, h('div', { class: 'stat-num' }, days), h('div', { class: 'muted' }, 'Trainingstage')),
+        h('div', {}, h('div', { class: 'stat-num small-num' }, count('gym')), h('div', { class: 'muted' }, 'Gym-Übungen')),
+        h('div', {}, h('div', { class: 'stat-num small-num' }, count('football')), h('div', { class: 'muted' }, 'Fußball')),
+        h('div', {}, h('div', { class: 'stat-num small-num' }, count('bodyweight')), h('div', { class: 'muted' }, 'Messungen')),
       ),
-      h('button', { class: 'btn-primary full', onclick: () => downloadCSV(entries), disabled: entries.length ? null : 'disabled' },
+      h('button', { class: 'btn-secondary full', onclick: () => downloadCSV(entries), disabled: entries.length ? null : 'disabled' },
         'CSV herunterladen'),
     ),
   ];
