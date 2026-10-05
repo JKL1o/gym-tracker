@@ -22,3 +22,24 @@ export function saveGymEntry(entry) {
 export function deleteGymEntry(date, exerciseId) {
   localStorage.setItem(KEY, JSON.stringify(removeGymEntry(loadEntries(), date, exerciseId)));
 }
+
+// Wochentyp ('normal' = Match Freitag, 'samstagsmatch') pro Woche, Schlüssel = Datum des Montags
+const WEEK_KEY = 'gymtracker.weektypes.v1';
+
+function loadWeekTypes() {
+  try {
+    return JSON.parse(localStorage.getItem(WEEK_KEY)) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export function getWeekType(mondayISO) {
+  return loadWeekTypes()[mondayISO] ?? 'normal';
+}
+
+export function setWeekType(mondayISO, type) {
+  const all = loadWeekTypes();
+  all[mondayISO] = type;
+  localStorage.setItem(WEEK_KEY, JSON.stringify(all));
+}

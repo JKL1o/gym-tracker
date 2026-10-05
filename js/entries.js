@@ -99,3 +99,10 @@ export function upsertGymEntry(entries, entry, now, newId) {
 export function removeGymEntry(entries, date, exerciseId) {
   return entries.filter((e) => !(e.type === 'gym' && e.date === date && e.exercise === exerciseId));
 }
+
+// Welche Einheit gilt an einem Tag?
+// 1. selbst gewählt (override)  2. Einheit, die an dem Tag schon eingetragen ist  3. laut Plan
+// An einem freien Tag ohne Einträge: null – dann wird keine Einheit angezeigt.
+export function sessionForDay({ date, planned, override, entries }) {
+  return override ?? entries.find((e) => e.type === 'gym' && e.date === date)?.session ?? planned ?? null;
+}

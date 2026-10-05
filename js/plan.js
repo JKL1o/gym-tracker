@@ -106,7 +106,7 @@ export const SESSIONS = {
 // gym: Schlüssel aus SESSIONS oder null; football: 'training', 'match' oder null.
 export const WEEK_TYPES = {
   normal: {
-    label: 'Normal (Match Fr)',
+    label: 'Match Freitag',
     days: [
       { gym: 'oka',  football: 'training' }, // Mo
       { gym: null,   football: null },       // Di
@@ -119,7 +119,7 @@ export const WEEK_TYPES = {
   },
   samstagsmatch: {
     // Gym.md: "Match am Samstag: Training Mo/Mi/Fr, Unterkörper auf Dienstag."
-    label: 'Samstagsmatch',
+    label: 'Match Samstag',
     days: [
       { gym: 'oka',  football: 'training' }, // Mo
       { gym: 'uk',   football: null },       // Di
