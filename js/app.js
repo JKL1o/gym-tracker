@@ -280,13 +280,12 @@ function footballCard(day, entries) {
     !main && !showOther
       ? h('button', { class: 'btn-text center', onclick: () => { state.footballOther = state.date; render(); } }, 'Fußball eintragen')
       : h('div', { class: 'card list' }, kinds.map((k) => footballRow(k, entry))),
-    // Match gibt es nur am Matchtag (oder an freien Tagen über "Fußball eintragen").
-    // Am Matchtag bleibt "Stattdessen Training" – für Wochen, in denen Freitag trainiert wird.
-    main === 'match' && !showOther && !entry
+    // Kam es anders (z. B. Match an einem Mittwoch)? Andere Art aufklappen …
+    main && !showOther && !entry
       ? h('button', { class: 'btn-text center', onclick: () => { state.footballOther = state.date; render(); } }, `Stattdessen ${other} eintragen`)
       : null,
-    // Versehentlich aufgeklappt? Zusätzliche Zeile wieder ausblenden (solange dort nichts eingetragen ist)
-    showOther && !entry
+    // … und jederzeit wieder zuklappen
+    showOther
       ? h('button', {
         class: 'btn-text center',
         onclick: () => { state.footballOther = null; state.matchPending = null; render(); },
