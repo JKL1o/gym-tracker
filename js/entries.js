@@ -94,3 +94,8 @@ export function upsertGymEntry(entries, entry, now, newId) {
   const updated = { ...old, ...entry, id: old.id, createdAt: old.createdAt, updatedAt: now };
   return entries.map((e, i) => (i === index ? updated : e));
 }
+
+// "Erledigt" zurücknehmen: entfernt den Gym-Eintrag dieser Übung an diesem Tag.
+export function removeGymEntry(entries, date, exerciseId) {
+  return entries.filter((e) => !(e.type === 'gym' && e.date === date && e.exercise === exerciseId));
+}

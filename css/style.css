@@ -146,6 +146,8 @@ button.primary {
 }
 .badge-done {
   padding: 8px 10px;
+  border: none;
+  cursor: pointer;
   border-radius: 8px;
   background: #dcf2e3;
   color: #1a7f37;

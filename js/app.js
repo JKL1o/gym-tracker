@@ -1,7 +1,7 @@
 // Oberfläche: Tabs umschalten und Inhalte anzeigen.
 import { EXERCISES, SESSIONS, WEEK_TYPES, plannedWeek, mondayOf, toISODate } from './plan.js';
 import { defaultsFor, parseNumber, validateGym, formatEntry, formatNumber } from './entries.js';
-import { loadEntries, saveGymEntry } from './store.js';
+import { loadEntries, saveGymEntry, deleteGymEntry } from './store.js';
 
 const view = document.getElementById('view');
 const state = {
@@ -129,7 +129,8 @@ function exerciseRow(sessionId, item, entries) {
     ),
     editing ? null : h('div', { class: 'row-actions' },
       done
-        ? h('span', { class: 'badge-done' }, 'Erledigt')
+        // Nochmal tippen nimmt "Erledigt" zurück
+        ? h('button', { class: 'badge-done', title: 'Nochmal tippen = zurücknehmen', onclick: () => { deleteGymEntry(state.logDate, item.ex); render(); } }, 'Erledigt')
         : h('button', { class: 'btn-done', onclick: () => store({ sets: values.sets, reps: values.reps, weight: values.weight }) }, 'Erledigt'),
       h('button', { class: 'btn-link', onclick: () => { state.editing = item.ex; render(); } }, 'Ändern'),
     ),

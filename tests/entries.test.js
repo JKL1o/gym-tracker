@@ -97,3 +97,14 @@ test('Speichern: neuer Eintrag wird angehängt, gleicher Tag + Übung wird erset
   all = upsertGymEntry(all, { ...base, exercise: 'dips', weight: 0 }, 't4', 'id4');
   assert.equal(all.length, 3, 'andere Übung = neuer Eintrag');
 });
+
+test('Erledigt zurücknehmen entfernt nur diese Übung an diesem Tag', async () => {
+  const { removeGymEntry } = await import('../js/entries.js');
+  const entries = [
+    { type: 'gym', date: '2026-10-05', exercise: 'klimmzuege' },
+    { type: 'gym', date: '2026-10-05', exercise: 'dips' },
+    { type: 'gym', date: '2026-09-28', exercise: 'klimmzuege' },
+  ];
+  const left = removeGymEntry(entries, '2026-10-05', 'klimmzuege');
+  assert.deepEqual(left.map((e) => e.date + e.exercise), ['2026-10-05dips', '2026-09-28klimmzuege']);
+});
