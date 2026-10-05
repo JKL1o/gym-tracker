@@ -81,30 +81,14 @@ test('Per-Hand-Übungen laut Rückmeldung (Hammer Curls, Curls im Sitzen, Seithe
   }
 });
 
-test('Speichern: neuer Eintrag wird angehängt, gleicher Tag + Übung wird ersetzt', async () => {
-  const { upsertGymEntry } = await import('../js/entries.js');
-  const base = { type: 'gym', date: '2026-10-05', exercise: 'klimmzuege', session: 'oka', sets: 4, reps: 5, weight: 2.5 };
-  let all = upsertGymEntry([], base, 't1', 'id1');
-  assert.equal(all.length, 1);
-  all = upsertGymEntry(all, { ...base, reps: 7 }, 't2', 'id2');
-  assert.equal(all.length, 1, 'kein Duplikat');
-  assert.equal(all[0].reps, 7);
-  assert.equal(all[0].id, 'id1');
-  assert.equal(all[0].createdAt, 't1');
-  assert.equal(all[0].updatedAt, 't2');
-  all = upsertGymEntry(all, { ...base, date: '2026-10-12' }, 't3', 'id3');
-  assert.equal(all.length, 2, 'anderer Tag = neuer Eintrag');
-  all = upsertGymEntry(all, { ...base, exercise: 'dips', weight: 0 }, 't4', 'id4');
-  assert.equal(all.length, 3, 'andere Übung = neuer Eintrag');
-});
-
-test('Erledigt zurücknehmen entfernt nur diese Übung an diesem Tag', async () => {
-  const { removeGymEntry } = await import('../js/entries.js');
-  const entries = [
-    { type: 'gym', date: '2026-10-05', exercise: 'klimmzuege' },
-    { type: 'gym', date: '2026-10-05', exercise: 'dips' },
-    { type: 'gym', date: '2026-09-28', exercise: 'klimmzuege' },
-  ];
-  const left = removeGymEntry(entries, '2026-10-05', 'klimmzuege');
-  assert.deepEqual(left.map((e) => e.date + e.exercise), ['2026-10-05dips', '2026-09-28klimmzuege']);
+test('Feste IDs: gleicher Tag + Übung = gleiche ID, sonst verschieden', async () => {
+  const { entryDocId } = await import('../js/entries.js');
+  const a = { type: 'gym', date: '2026-10-05', exercise: 'klimmzuege' };
+  assert.equal(entryDocId(a), 'gym_2026-10-05_klimmzuege');
+  assert.equal(entryDocId({ ...a, reps: 7 }), entryDocId(a), 'Ändern überschreibt denselben Eintrag');
+  assert.notEqual(entryDocId({ ...a, date: '2026-10-12' }), entryDocId(a));
+  assert.notEqual(entryDocId({ ...a, exercise: 'dips' }), entryDocId(a));
+  assert.equal(entryDocId({ type: 'football', date: '2026-10-09', kind: 'match' }), 'football_2026-10-09');
+  assert.equal(entryDocId({ type: 'bodyweight', date: '2026-10-09', kg: 68 }), 'bodyweight_2026-10-09');
+  assert.notEqual(entryDocId({ type: 'football', date: '2026-10-09' }), entryDocId({ type: 'bodyweight', date: '2026-10-09' }));
 });

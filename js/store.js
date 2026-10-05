@@ -1,35 +1,123 @@
-// Datenspeicher. Vorläufig im Browser (localStorage) – in Schritt 7 wird hier auf Firebase
-// umgestellt. Der Rest der App greift nur über diese Funktionen auf Daten zu.
-import { upsertGymEntry, removeGymEntry, upsertDayEntry, removeDayEntry } from './entries.js';
+// Datenspeicher: Firebase (Google-Login + Firestore-Datenbank).
+//
+// So funktioniert es:
+// - Alle Einträge liegen unter users/{deine Nutzer-ID}/entries – nur du kannst sie lesen/schreiben
+//   (abgesichert durch die Firestore-Regeln, siehe firestore.rules).
+// - Firestore hält eine Kopie auf dem Gerät. Ohne Netz wird lokal gespeichert und später
+//   automatisch hochgeladen.
+// - Die App liest aus einer Kopie im Arbeitsspeicher (`cache`), die Firestore laufend aktuell hält.
+//   Bei jeder Änderung (auch von einem anderen Gerät) wird die Oberfläche neu gezeichnet.
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
+import {
+  getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut,
+} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
+import {
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, setDoc, deleteDoc, onSnapshot,
+} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { firebaseConfig } from './firebase-config.js';
+import { entryDocId } from './entries.js';
 
-const KEY = 'gymtracker.entries.v1';
+export const isConfigured = firebaseConfig !== null;
 
-export function loadEntries() {
+let auth = null;
+let db = null;
+let user = null;
+let authChecked = false; // erst true, wenn Firebase weiß, ob jemand angemeldet ist
+let dataLoaded = false;  // erst true, wenn die Einträge einmal geladen wurden
+let cache = [];
+let unsubscribe = null;
+let changeListener = () => {};
+let errorListener = () => {};
+
+export function onChange(fn) { changeListener = fn; }
+export function onError(fn) { errorListener = fn; }
+
+export function status() {
+  return { configured: isConfigured, authChecked, user, dataLoaded };
+}
+
+export function initStore() {
+  if (!isConfigured) return;
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    ignoreUndefinedProperties: true,
+  });
+
+  onAuthStateChanged(auth, (u) => {
+    user = u;
+    authChecked = true;
+    unsubscribe?.();
+    unsubscribe = null;
+    cache = [];
+    dataLoaded = false;
+    if (u) {
+      unsubscribe = onSnapshot(
+        collection(db, 'users', u.uid, 'entries'),
+        (snapshot) => {
+          cache = snapshot.docs.map((d) => d.data());
+          dataLoaded = true;
+          changeListener();
+        },
+        (err) => errorListener(`Laden fehlgeschlagen: ${err.message}`),
+      );
+    }
+    changeListener();
+  });
+}
+
+export async function signIn() {
   try {
-    return JSON.parse(localStorage.getItem(KEY)) ?? [];
-  } catch {
-    return [];
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (err) {
+    // Fenster selbst geschlossen = kein Fehler
+    if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      errorListener(`Anmeldung fehlgeschlagen: ${err.code ?? err.message}`);
+    }
   }
 }
 
-// Gym-Eintrag speichern oder den vom selben Tag ersetzen
+export function signOut() {
+  return fbSignOut(auth);
+}
+
+export function loadEntries() {
+  return cache;
+}
+
+function entryRef(id) {
+  return doc(db, 'users', user.uid, 'entries', id);
+}
+
+// Speichern = Eintrag mit fester ID schreiben (überschreibt den alten vom selben Tag).
+// Kein `await`: Firestore aktualisiert die lokale Kopie sofort, das Hochladen läuft im Hintergrund.
+function write(entry) {
+  const id = entryDocId(entry);
+  const existing = cache.find((e) => e.id === id);
+  const now = new Date().toISOString();
+  const data = { ...entry, id, createdAt: existing?.createdAt ?? now, updatedAt: existing ? now : undefined };
+  setDoc(entryRef(id), data).catch((err) => errorListener(`Speichern fehlgeschlagen: ${err.message}`));
+}
+
+function remove(id) {
+  deleteDoc(entryRef(id)).catch((err) => errorListener(`Löschen fehlgeschlagen: ${err.message}`));
+}
+
 export function saveGymEntry(entry) {
-  const all = upsertGymEntry(loadEntries(), entry, new Date().toISOString(), crypto.randomUUID());
-  localStorage.setItem(KEY, JSON.stringify(all));
+  write(entry);
 }
 
-// Gym-Eintrag eines Tages entfernen ("Erledigt" zurücknehmen)
-export function deleteGymEntry(date, exerciseId) {
-  localStorage.setItem(KEY, JSON.stringify(removeGymEntry(loadEntries(), date, exerciseId)));
+export function deleteGymEntry(date, exercise) {
+  remove(entryDocId({ type: 'gym', date, exercise }));
 }
 
-
-// Fußball oder Körpergewicht speichern (ein Eintrag pro Art und Tag)
+// Fußball oder Körpergewicht (ein Eintrag pro Art und Tag)
 export function saveDayEntry(entry) {
-  const all = upsertDayEntry(loadEntries(), entry, new Date().toISOString(), crypto.randomUUID());
-  localStorage.setItem(KEY, JSON.stringify(all));
+  write(entry);
 }
 
 export function deleteDayEntry(type, date) {
-  localStorage.setItem(KEY, JSON.stringify(removeDayEntry(loadEntries(), type, date)));
+  remove(entryDocId({ type, date }));
 }

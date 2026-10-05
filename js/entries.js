@@ -84,20 +84,12 @@ export function formatEntry(entry) {
   return `${entry.sets} × ${formatNumber(entry.reps)} ${UNIT_LABEL[ex.unit]}${side} · ${formatWeight(entry.exercise, entry.weight)}`;
 }
 
-// Gym-Eintrag speichern: pro Tag und Übung gibt es genau einen Eintrag.
-// Existiert schon einer (z. B. "Erledigt" getippt, dann "Ändern"), wird er ersetzt statt verdoppelt.
-// `now` und `newId` werden übergeben, damit die Funktion testbar bleibt.
-export function upsertGymEntry(entries, entry, now, newId) {
-  const index = entries.findIndex((e) => e.type === 'gym' && e.date === entry.date && e.exercise === entry.exercise);
-  if (index === -1) return [...entries, { ...entry, id: newId, createdAt: now }];
-  const old = entries[index];
-  const updated = { ...old, ...entry, id: old.id, createdAt: old.createdAt, updatedAt: now };
-  return entries.map((e, i) => (i === index ? updated : e));
-}
-
-// "Erledigt" zurücknehmen: entfernt den Gym-Eintrag dieser Übung an diesem Tag.
-export function removeGymEntry(entries, date, exerciseId) {
-  return entries.filter((e) => !(e.type === 'gym' && e.date === date && e.exercise === exerciseId));
+// Feste ID pro Eintrag: pro Tag und Übung (Gym) bzw. pro Tag und Art (Fußball, Körpergewicht)
+// gibt es genau einen Datensatz. Speichern mit derselben ID überschreibt – so entstehen keine
+// Duplikate, auch nicht, wenn Handy und PC offline beide etwas eintragen.
+export function entryDocId(entry) {
+  if (entry.type === 'gym') return `gym_${entry.date}_${entry.exercise}`;
+  return `${entry.type}_${entry.date}`;
 }
 
 // Welche Einheit gilt an einem Tag?
@@ -107,20 +99,7 @@ export function sessionForDay({ date, planned, override, entries }) {
   return override ?? entries.find((e) => e.type === 'gym' && e.date === date)?.session ?? planned ?? null;
 }
 
-// ---------- Fußball und Körpergewicht: ein Eintrag pro Tag ----------
-
-// Speichern oder den Eintrag gleicher Art am selben Tag ersetzen.
-export function upsertDayEntry(entries, entry, now, newId) {
-  const index = entries.findIndex((e) => e.type === entry.type && e.date === entry.date);
-  if (index === -1) return [...entries, { ...entry, id: newId, createdAt: now }];
-  const old = entries[index];
-  const updated = { ...entry, id: old.id, createdAt: old.createdAt, updatedAt: now };
-  return entries.map((e, i) => (i === index ? updated : e));
-}
-
-export function removeDayEntry(entries, type, date) {
-  return entries.filter((e) => !(e.type === type && e.date === date));
-}
+// ---------- Fußball und Körpergewicht ----------
 
 // Fußball: kind 'training' oder 'match'; bei Match Spielminuten (0–150, inkl. Verlängerung)
 export function validateFootball(entry) {
@@ -136,10 +115,11 @@ export function validateFootball(entry) {
   return errors;
 }
 
-// Körpergewicht in kg (30–200, mit Kommastellen)
-export function validateBodyweight(entry) {
+// Körpergewicht in kg (30–200, mit Kommastellen); Datum nicht in der Zukunft
+export function validateBodyweight(entry, today) {
   const errors = [];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date ?? '')) errors.push('Datum fehlt');
+  else if (entry.date > today) errors.push('Datum liegt in der Zukunft');
   if (!(entry.kg >= 30 && entry.kg <= 200)) errors.push('Gewicht: Zahl zwischen 30 und 200 kg');
   return errors;
 }

@@ -4,11 +4,16 @@ import {
   defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay,
   validateFootball, validateBodyweight, bodyweightHistory, bodyweightChange,
 } from './entries.js';
-import { loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry } from './store.js';
+import {
+  loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry,
+  initStore, onChange, onError, status, signIn, signOut,
+} from './store.js';
 import { toCSV } from './export.js';
 
 const view = document.getElementById('view');
-const TODAY = toISODate(new Date());
+// "Heute" – wird beim Zurückkehren in die App neu bestimmt (siehe unten), damit eine
+// über Nacht offene App am nächsten Tag nicht noch den Vortag zeigt.
+let TODAY = toISODate(new Date());
 const state = {
   tab: 'training',
   date: TODAY,        // ausgewählter Tag (Training) bzw. Woche, die angezeigt wird
@@ -17,6 +22,7 @@ const state = {
   editing: null,      // Übung, deren Felder gerade aufgeklappt sind
   openDay: null,      // im Wochenplan aufgeklappter Tag
   matchPending: null, // Datum, an dem "Match" angetippt, aber noch nicht gespeichert ist
+  error: null,        // Fehlermeldung (Speichern/Anmelden), oben eingeblendet
 };
 
 const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -360,7 +366,7 @@ function bodyweightCard(entries) {
 
   function save() {
     const entry = { type: 'bodyweight', date: dateInput.value, kg: parseNumber(kgInput.value) };
-    const errors = validateBodyweight(entry);
+    const errors = validateBodyweight(entry, TODAY);
     if (errors.length) {
       message.textContent = errors.join(' · ');
       return;
@@ -417,21 +423,84 @@ function renderData() {
       h('button', { class: 'btn-secondary full', onclick: () => downloadCSV(entries), disabled: entries.length ? null : 'disabled' },
         'CSV herunterladen'),
     ),
+    h('div', { class: 'card account' },
+      h('div', {},
+        h('div', { class: 'card-title' }, 'Konto'),
+        h('div', { class: 'muted' }, status().user?.email ?? ''),
+      ),
+      h('button', { class: 'btn-text', onclick: () => signOut() }, 'Abmelden'),
+    ),
   ];
+}
+
+// ---------- Anmeldung ----------
+
+function renderGate(title, text, button) {
+  return h('div', { class: 'gate' },
+    h('img', { src: 'icons/icon-192.png', alt: '', class: 'gate-icon' }),
+    h('h1', { class: 'page-title' }, title),
+    text ? h('p', { class: 'muted' }, text) : null,
+    button,
+  );
 }
 
 // ---------- Rahmen ----------
 
+function renderContent() {
+  const st = status();
+  if (!st.configured) {
+    return renderGate('Firebase fehlt', 'In js/firebase-config.js sind noch keine Zugangsdaten eingetragen.', null);
+  }
+  if (!st.authChecked || (st.user && !st.dataLoaded)) return renderGate('Gym-Tracker', 'Lädt …', null);
+  if (!st.user) {
+    return renderGate('Gym-Tracker', 'Melde dich mit deinem Google-Konto an. Deine Daten sind dann auf Handy und PC gleich.',
+      h('button', { class: 'btn-primary', onclick: () => signIn() }, 'Mit Google anmelden'));
+  }
+  return state.tab === 'woche' ? renderWeek()
+    : state.tab === 'daten' ? renderData()
+    : renderTraining();
+}
+
 function render() {
+  const loggedIn = Boolean(status().user && status().dataLoaded);
+  document.getElementById('tabs').hidden = !loggedIn; // Navigation erst nach dem Anmelden
   for (const btn of document.querySelectorAll('#tabs button')) {
     btn.classList.toggle('active', btn.dataset.tab === state.tab);
   }
-  const content = state.tab === 'woche' ? renderWeek()
-    : state.tab === 'daten' ? renderData()
-    : renderTraining();
+  const banner = state.error
+    ? h('div', { class: 'banner' }, h('span', {}, state.error),
+      h('button', { class: 'btn-text', onclick: () => { state.error = null; render(); } }, 'OK'))
+    : null;
   // Leere Einträge (null) entfernen – replaceChildren würde sie sonst als Text "null" anzeigen
-  view.replaceChildren(...[content].flat(Infinity).filter((node) => node instanceof Node));
+  view.replaceChildren(...[banner, renderContent()].flat(Infinity).filter((node) => node instanceof Node));
 }
+
+// Änderungen aus der Datenbank (auch vom anderen Gerät) neu zeichnen – aber nicht, während
+// gerade in ein Feld getippt wird; dann erst, wenn das Feld verlassen wird.
+let renderPending = false;
+function renderSoon() {
+  if (document.activeElement?.tagName === 'INPUT' && view.contains(document.activeElement)) {
+    renderPending = true;
+    return;
+  }
+  render();
+}
+view.addEventListener('focusout', () => {
+  if (renderPending) {
+    renderPending = false;
+    setTimeout(renderSoon, 0); // nach dem Klick auf "Speichern" etc.
+  }
+});
+
+// Neuer Tag seit dem letzten Öffnen? Dann "heute" weiterschalten.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const now = toISODate(new Date());
+  if (now === TODAY) return;
+  if (state.date === TODAY) state.date = now;
+  TODAY = now;
+  render();
+});
 
 for (const btn of document.querySelectorAll('#tabs button')) {
   btn.addEventListener('click', () => {
@@ -443,4 +512,12 @@ for (const btn of document.querySelectorAll('#tabs button')) {
   });
 }
 
+onChange(renderSoon);
+onError((message) => { state.error = message; render(); });
+initStore();
 render();
+
+// Offline-Fähigkeit: Service Worker registrieren
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('Service Worker:', err));
+}
