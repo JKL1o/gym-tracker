@@ -273,6 +273,13 @@ function footballCard(day, entries) {
     main && !showOther && !entry
       ? h('button', { class: 'btn-text center', onclick: () => { state.footballOther = state.date; render(); } }, `Stattdessen ${other} eintragen`)
       : null,
+    // Versehentlich aufgeklappt? Zusätzliche Zeile wieder ausblenden (solange dort nichts eingetragen ist)
+    showOther && !entry
+      ? h('button', {
+        class: 'btn-text center',
+        onclick: () => { state.footballOther = null; state.matchPending = null; render(); },
+      }, main ? `${other} ausblenden` : 'Ausblenden')
+      : null,
   ];
 }
 
