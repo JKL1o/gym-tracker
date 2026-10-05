@@ -105,3 +105,53 @@ button.primary {
 .error { color: #c62828; font-size: 0.9rem; margin-bottom: 6px; }
 .error:empty { display: none; }
 .saved { margin-top: 6px; font-size: 0.9rem; color: #1a7f37; }
+
+/* Übersicht der Einheit: eine Karte, eine Zeile pro Übung */
+.card.list { padding: 0; overflow: hidden; }
+.list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.row { padding: 10px 12px; border-bottom: 1px solid var(--border); border-left: 4px solid transparent; }
+.row:last-child { border-bottom: none; }
+.row.done { border-left-color: #1a7f37; background: #f3faf5; }
+.row.editing { background: #f5f8ff; border-left-color: var(--accent); }
+.row-head { display: flex; align-items: center; gap: 10px; }
+.row-text { flex: 1; min-width: 0; }
+.row-name { font-weight: 600; }
+.row-values { margin-top: 2px; }
+.small { font-size: 0.8rem; }
+.row-actions { display: flex; flex-direction: column; align-items: stretch; gap: 4px; flex-shrink: 0; width: 92px; }
+.btn-done {
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.btn-link {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.badge-done {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #dcf2e3;
+  color: #1a7f37;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+.edit-actions { display: flex; gap: 8px; }
+.edit-actions button { flex: 1; padding: 10px; font-size: 1rem; }

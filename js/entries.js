@@ -83,3 +83,14 @@ export function formatEntry(entry) {
   const side = ex.perSide ? ' / Seite' : '';
   return `${entry.sets} × ${formatNumber(entry.reps)} ${UNIT_LABEL[ex.unit]}${side} · ${formatWeight(entry.exercise, entry.weight)}`;
 }
+
+// Gym-Eintrag speichern: pro Tag und Übung gibt es genau einen Eintrag.
+// Existiert schon einer (z. B. "Erledigt" getippt, dann "Ändern"), wird er ersetzt statt verdoppelt.
+// `now` und `newId` werden übergeben, damit die Funktion testbar bleibt.
+export function upsertGymEntry(entries, entry, now, newId) {
+  const index = entries.findIndex((e) => e.type === 'gym' && e.date === entry.date && e.exercise === entry.exercise);
+  if (index === -1) return [...entries, { ...entry, id: newId, createdAt: now }];
+  const old = entries[index];
+  const updated = { ...old, ...entry, id: old.id, createdAt: old.createdAt, updatedAt: now };
+  return entries.map((e, i) => (i === index ? updated : e));
+}

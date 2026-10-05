@@ -80,3 +80,20 @@ test('Per-Hand-Übungen laut Rückmeldung (Hammer Curls, Curls im Sitzen, Seithe
     assert.equal(EXERCISES[id].load, 'kg2', id);
   }
 });
+
+test('Speichern: neuer Eintrag wird angehängt, gleicher Tag + Übung wird ersetzt', async () => {
+  const { upsertGymEntry } = await import('../js/entries.js');
+  const base = { type: 'gym', date: '2026-10-05', exercise: 'klimmzuege', session: 'oka', sets: 4, reps: 5, weight: 2.5 };
+  let all = upsertGymEntry([], base, 't1', 'id1');
+  assert.equal(all.length, 1);
+  all = upsertGymEntry(all, { ...base, reps: 7 }, 't2', 'id2');
+  assert.equal(all.length, 1, 'kein Duplikat');
+  assert.equal(all[0].reps, 7);
+  assert.equal(all[0].id, 'id1');
+  assert.equal(all[0].createdAt, 't1');
+  assert.equal(all[0].updatedAt, 't2');
+  all = upsertGymEntry(all, { ...base, date: '2026-10-12' }, 't3', 'id3');
+  assert.equal(all.length, 2, 'anderer Tag = neuer Eintrag');
+  all = upsertGymEntry(all, { ...base, exercise: 'dips', weight: 0 }, 't4', 'id4');
+  assert.equal(all.length, 3, 'andere Übung = neuer Eintrag');
+});

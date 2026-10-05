@@ -1,7 +1,7 @@
 // Oberfläche: Tabs umschalten und Inhalte anzeigen.
 import { EXERCISES, SESSIONS, WEEK_TYPES, plannedWeek, mondayOf, toISODate } from './plan.js';
 import { defaultsFor, parseNumber, validateGym, formatEntry, formatNumber } from './entries.js';
-import { loadEntries, addEntry } from './store.js';
+import { loadEntries, saveGymEntry } from './store.js';
 
 const view = document.getElementById('view');
 const state = {
@@ -9,6 +9,7 @@ const state = {
   weekType: 'normal', // vorläufig nur Ansicht, wird ab Schritt 4 pro Woche gespeichert
   logDate: toISODate(new Date()),
   logSession: null, // null = Einheit, die laut Plan an logDate dran ist
+  editing: null,    // Übung, deren Felder gerade aufgeklappt sind
 };
 
 // Kleines Hilfsmittel zum Erzeugen von HTML-Elementen.
@@ -101,43 +102,64 @@ function numberField(label, value, mode) {
   return { input, el: h('label', { class: 'field' }, h('span', {}, label), input) };
 }
 
-// Karte für eine Übung: Planwert, drei Eingabefelder, Speichern, heute schon Eingetragenes.
-function exerciseCard(sessionId, item, entries) {
+// Eine Zeile der Übersicht. Standard: Werte für heute + Plan, Knöpfe "Erledigt" und "Ändern".
+// Nur bei "Ändern" klappen die Eingabefelder auf.
+function exerciseRow(sessionId, item, entries) {
   const ex = EXERCISES[item.ex];
-  const d = defaultsFor(sessionId, item.ex, entries);
-  const sets = numberField('Sätze', d.sets, 'numeric');
-  const reps = numberField(repsLabel(ex), d.reps === null ? '' : formatNumber(d.reps), 'decimal');
-  const weight = ex.load === 'none' ? null : numberField(WEIGHT_LABEL[ex.load], formatNumber(d.weight), 'decimal');
-  const message = h('div', { class: 'error' });
-  const today = entries.filter((e) => e.type === 'gym' && e.exercise === item.ex && e.date === state.logDate);
+  const done = entries.find((e) => e.type === 'gym' && e.exercise === item.ex && e.date === state.logDate);
+  const values = done ?? defaultsFor(sessionId, item.ex, entries); // heute erledigt, sonst letztes Mal / Plan
+  const editing = state.editing === item.ex;
+  const planText = `Plan ${item.sets} × ${item.reps} · ${item.kg}${item.estimate ? ' (geschätzt)' : ''}`;
 
-  function save() {
-    const entry = {
-      type: 'gym',
-      date: state.logDate,
-      session: sessionId,
-      exercise: item.ex,
-      sets: parseNumber(sets.input.value),
-      reps: parseNumber(reps.input.value),
-      weight: weight ? parseNumber(weight.input.value) : null,
-    };
+  function store(v) {
+    const entry = { type: 'gym', date: state.logDate, session: sessionId, exercise: item.ex, ...v };
     const errors = validateGym(entry);
-    if (errors.length) {
-      message.textContent = errors.join(' · ');
-      return;
-    }
-    addEntry(entry);
+    if (errors.length) return errors;
+    saveGymEntry(entry);
+    state.editing = null;
     render();
+    return [];
   }
 
-  return h('div', { class: 'card' },
-    h('div', { class: 'day-head' }, h('span', {}, ex.name)),
-    h('div', { class: 'muted' }, `Plan: ${item.sets} × ${item.reps} · ${item.kg}${item.estimate ? ' (Schätzwert)' : ''}`,
-      ex.note ? ` · ${ex.note}` : ''),
+  const head = h('div', { class: 'row-head' },
+    h('div', { class: 'row-text' },
+      h('div', { class: 'row-name' }, ex.name),
+      h('div', { class: 'row-values' }, formatEntry({ exercise: item.ex, ...values })),
+      h('div', { class: 'muted small' }, planText, ex.note ? ` · ${ex.note}` : ''),
+    ),
+    editing ? null : h('div', { class: 'row-actions' },
+      done
+        ? h('span', { class: 'badge-done' }, 'Erledigt')
+        : h('button', { class: 'btn-done', onclick: () => store({ sets: values.sets, reps: values.reps, weight: values.weight }) }, 'Erledigt'),
+      h('button', { class: 'btn-link', onclick: () => { state.editing = item.ex; render(); } }, 'Ändern'),
+    ),
+  );
+
+  if (!editing) return h('div', { class: done ? 'row done' : 'row' }, head);
+
+  // Bearbeiten: Felder mit den aktuellen Werten vorbelegt
+  const sets = numberField('Sätze', values.sets, 'numeric');
+  const reps = numberField(repsLabel(ex), formatNumber(values.reps), 'decimal');
+  const weight = ex.load === 'none' ? null : numberField(WEIGHT_LABEL[ex.load], formatNumber(values.weight), 'decimal');
+  const message = h('div', { class: 'error' });
+
+  return h('div', { class: 'row editing' }, head,
     h('div', { class: 'fields' }, sets.el, reps.el, weight?.el),
     message,
-    h('button', { class: 'primary', onclick: save }, 'Speichern'),
-    today.map((e) => h('div', { class: 'saved' }, `Eingetragen: ${formatEntry(e)}`)),
+    h('div', { class: 'edit-actions' },
+      h('button', { class: 'btn-link', onclick: () => { state.editing = null; render(); } }, 'Abbrechen'),
+      h('button', {
+        class: 'btn-done',
+        onclick: () => {
+          const errors = store({
+            sets: parseNumber(sets.input.value),
+            reps: parseNumber(reps.input.value),
+            weight: weight ? parseNumber(weight.input.value) : null,
+          });
+          message.textContent = errors.join(' · ');
+        },
+      }, 'Speichern'),
+    ),
   );
 }
 
@@ -152,13 +174,14 @@ function renderLog() {
     onchange: (e) => {
       if (!e.target.value) return;
       state.logDate = e.target.value;
+      state.editing = null;
       state.logSession = null; // neue Tagesauswahl → wieder die geplante Einheit vorschlagen
       render();
     },
   });
 
   const sessionSelect = h('select', {
-    onchange: (e) => { state.logSession = e.target.value; render(); },
+    onchange: (e) => { state.logSession = e.target.value; state.editing = null; render(); },
   }, Object.entries(SESSIONS).map(([id, s]) => {
     const option = h('option', { value: id }, s.name + (id === planned ? ' (laut Plan heute)' : ''));
     option.selected = id === sessionId;
@@ -166,6 +189,8 @@ function renderLog() {
   }));
 
   const session = SESSIONS[sessionId];
+  const doneCount = session.items.filter((item) =>
+    entries.some((e) => e.type === 'gym' && e.exercise === item.ex && e.date === state.logDate)).length;
   return [
     h('h2', {}, 'Gym-Einheit eintragen'),
     h('p', { class: 'muted' }, 'Fußball und Körpergewicht kommen in Schritt 3.'),
@@ -174,7 +199,13 @@ function renderLog() {
       h('label', { class: 'field' }, h('span', {}, 'Einheit'), sessionSelect),
     ),
     session.note ? h('p', { class: 'muted' }, session.note) : null,
-    session.items.map((item) => exerciseCard(sessionId, item, entries)),
+    h('div', { class: 'card list' },
+      h('div', { class: 'list-head' },
+        h('span', {}, session.name),
+        h('span', { class: 'muted small' }, `${doneCount} / ${session.items.length} erledigt`),
+      ),
+      session.items.map((item) => exerciseRow(sessionId, item, entries)),
+    ),
   ];
 }
 
