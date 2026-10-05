@@ -240,13 +240,23 @@ function footballRow(kind, entry) {
     h('div', { class: 'fields' }, h('label', { class: 'field' }, h('span', {}, 'Spielminuten'), minutes)),
     message,
     h('div', { class: 'edit-actions' },
-      h('button', { class: 'btn-secondary', onclick: () => { state.matchPending = null; render(); } }, 'Später'),
+      // Abbrechen = Match zurücknehmen (wenn noch keine Minuten gespeichert waren) und Zeile zuklappen.
+      // Beim Ändern bereits gespeicherter Minuten bleibt das Match unverändert stehen.
+      h('button', {
+        class: 'btn-secondary',
+        onclick: () => {
+          if (done && entry.minutes === null) deleteDayEntry('football', state.date);
+          state.matchPending = null;
+          state.footballOther = null;
+          render();
+        },
+      }, 'Abbrechen'),
       h('button', {
         class: 'btn-primary',
         onclick: () => {
           const newEntry = { type: 'football', date: state.date, kind: 'match', minutes: parseNumber(minutes.value) };
           if (newEntry.minutes === null) {
-            message.textContent = 'Spielminuten eingeben oder "Später" tippen';
+            message.textContent = 'Spielminuten eingeben';
             return;
           }
           const errors = validateFootball(newEntry);
