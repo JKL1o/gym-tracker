@@ -1,7 +1,7 @@
 // Oberfläche: Training eintragen, Wochenplan, Daten-Export.
-import { EXERCISES, SESSIONS, WEEK_TYPES, plannedWeek, mondayOf, toISODate } from './plan.js';
+import { EXERCISES, SESSIONS, plannedWeek, mondayOf, toISODate } from './plan.js';
 import { defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay } from './entries.js';
-import { loadEntries, saveGymEntry, deleteGymEntry, getWeekType, setWeekType } from './store.js';
+import { loadEntries, saveGymEntry, deleteGymEntry } from './store.js';
 import { toCSV } from './export.js';
 
 const view = document.getElementById('view');
@@ -46,12 +46,10 @@ function shortDate(iso) {
   return `${d.getDate()}. ${MONTHS[d.getMonth()].slice(0, 3)}.`;
 }
 
-// Wochenplan der Woche, in der `iso` liegt – mit dem für diese Woche gespeicherten Typ
+// Wochenplan der Woche, in der `iso` liegt. Immer die normale Woche (Match Freitag) –
+// bei Samstagsmatch entscheidest du selbst und wählst die Einheit über "Andere Einheit".
 function weekOf(iso) {
-  const monday = mondayOf(parseISO(iso));
-  const mondayISO = toISODate(monday);
-  const type = getWeekType(mondayISO);
-  return { mondayISO, type, days: plannedWeek(type, monday) };
+  return { days: plannedWeek('normal', mondayOf(parseISO(iso))) };
 }
 
 function shiftDate(days) {
@@ -238,13 +236,6 @@ function renderTraining() {
 function renderWeek() {
   const week = weekOf(state.date);
 
-  const segmented = h('div', { class: 'segmented' },
-    Object.entries(WEEK_TYPES).map(([key, type]) => h('button', {
-      class: key === week.type ? 'active' : '',
-      onclick: () => { setWeekType(week.mondayISO, key); render(); },
-    }, type.label)),
-  );
-
   const list = h('div', { class: 'card list' }, week.days.map((d, i) => {
     const open = state.openDay === d.date;
     const session = d.gym ? SESSIONS[d.gym] : null;
@@ -272,9 +263,6 @@ function renderWeek() {
 
   return [
     weekNav(week),
-    h('div', { class: 'section-label' }, 'Match in dieser Woche'),
-    segmented,
-    h('div', { class: 'section-label' }, 'Plan'),
     list,
   ];
 }

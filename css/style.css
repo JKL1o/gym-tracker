@@ -221,11 +221,6 @@ nav#tabs button.active { color: var(--accent); }
 }
 
 /* ---------- Woche ---------- */
-.section-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 16px 0 8px; }
-.segmented { display: flex; padding: 3px; background: #e9ebef; border-radius: 10px; }
-.segmented button { flex: 1; padding: 8px; border: none; border-radius: 8px; background: none; font-size: 0.9rem; font-weight: 500; color: var(--muted); cursor: pointer; }
-.segmented button.active { background: var(--card); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
-
 .week-row { border-bottom: 1px solid var(--border); }
 .week-row:last-child { border-bottom: none; }
 .week-row-main {
