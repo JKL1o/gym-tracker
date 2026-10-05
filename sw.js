@@ -2,7 +2,7 @@
 // Strategie "Netz zuerst": online immer die neueste Version laden (und Kopie ablegen),
 // offline oder bei sehr langsamem Netz die abgelegte Kopie verwenden.
 // Die Daten selbst speichert Firestore – hier geht es nur um die App-Dateien.
-const CACHE = 'gym-tracker-v1';
+const CACHE = 'gym-tracker-v2';
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0/';
 const ASSETS = [
   './',
@@ -24,7 +24,9 @@ const ASSETS = [
 const TIMEOUT_MS = 4000;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload' = frisch vom Server holen, nicht aus der 10-Minuten-Zwischenkopie des Browsers
+  const fresh = ASSETS.map((url) => new Request(url, { cache: 'reload' }));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(fresh)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -47,7 +49,9 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cached = await caches.match(request);
     try {
-      const network = fetch(request).then((response) => {
+      // cache: 'no-cache' = beim Server nachfragen, ob es eine neuere Version gibt.
+      // Sonst nimmt der Browser bis zu 10 Minuten lang eine alte Kopie (GitHub: max-age=600).
+      const network = fetch(own ? new Request(request.url, { cache: 'no-cache' }) : request).then((response) => {
         if (response.ok) {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put(request, copy));

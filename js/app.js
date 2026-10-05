@@ -202,10 +202,11 @@ function footballRow(kind, entry) {
   function toggle() {
     if (done) {
       deleteDayEntry('football', state.date);
-    } else if (kind === 'training') {
-      saveDayEntry({ type: 'football', date: state.date, kind: 'training', minutes: null });
+      state.matchPending = null;
     } else {
-      state.matchPending = state.date; // bei Match zuerst die Spielminuten abfragen
+      // Sofort abhaken; bei Match öffnet sich danach das Feld für die Spielminuten
+      saveDayEntry({ type: 'football', date: state.date, kind, minutes: null });
+      state.matchPending = kind === 'match' ? state.date : null;
     }
     render();
   }
@@ -219,26 +220,35 @@ function footballRow(kind, entry) {
       }),
       h('div', { class: 'row-text' },
         h('div', { class: 'row-name' }, kind === 'match' ? 'Match' : 'Fußballtraining'),
-        done && kind === 'match' ? h('div', { class: 'row-values' }, `${entry.minutes} Spielminuten`) : null,
+        done && kind === 'match'
+          ? (entry.minutes === null
+            ? h('div', { class: 'row-values warn' }, 'Spielminuten fehlen')
+            : h('div', { class: 'row-values' }, `${entry.minutes} Spielminuten`))
+          : null,
       ),
       done && kind === 'match' && !editing
-        ? h('button', { class: 'btn-text', onclick: () => { state.matchPending = state.date; render(); } }, 'Ändern')
+        ? h('button', { class: 'btn-text', onclick: () => { state.matchPending = state.date; render(); } },
+          entry.minutes === null ? 'Eintragen' : 'Ändern')
         : null,
     ),
   );
   if (!editing) return row;
 
-  const minutes = h('input', { type: 'text', inputmode: 'numeric', value: done ? entry.minutes : '', placeholder: 'z. B. 70' });
+  const minutes = h('input', { type: 'text', inputmode: 'numeric', value: done ? (entry.minutes ?? '') : '', placeholder: 'z. B. 70' });
   const message = h('div', { class: 'error' });
   row.append(h('div', { class: 'edit' },
     h('div', { class: 'fields' }, h('label', { class: 'field' }, h('span', {}, 'Spielminuten'), minutes)),
     message,
     h('div', { class: 'edit-actions' },
-      h('button', { class: 'btn-secondary', onclick: () => { state.matchPending = null; render(); } }, 'Abbrechen'),
+      h('button', { class: 'btn-secondary', onclick: () => { state.matchPending = null; render(); } }, 'Später'),
       h('button', {
         class: 'btn-primary',
         onclick: () => {
           const newEntry = { type: 'football', date: state.date, kind: 'match', minutes: parseNumber(minutes.value) };
+          if (newEntry.minutes === null) {
+            message.textContent = 'Spielminuten eingeben oder "Später" tippen';
+            return;
+          }
           const errors = validateFootball(newEntry);
           if (errors.length) {
             message.textContent = errors.join(' · ');

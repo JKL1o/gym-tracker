@@ -302,3 +302,5 @@ nav#tabs[hidden] { display: none; }
   margin-bottom: 12px;
   font-size: 0.9rem;
 }
+
+.row-values.warn { color: var(--match); font-size: 0.9rem; }

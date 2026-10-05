@@ -101,12 +101,15 @@ export function sessionForDay({ date, planned, override, entries }) {
 
 // ---------- Fußball und Körpergewicht ----------
 
-// Fußball: kind 'training' oder 'match'; bei Match Spielminuten (0–150, inkl. Verlängerung)
+// Fußball: kind 'training' oder 'match'. Bei Match Spielminuten 0–150 (inkl. Verlängerung) –
+// oder noch leer (null), wenn das Match abgehakt, die Minuten aber noch nicht eingetragen sind.
 export function validateFootball(entry) {
   const errors = [];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date ?? '')) errors.push('Datum fehlt');
   if (entry.kind === 'match') {
-    if (!Number.isInteger(entry.minutes) || entry.minutes < 0 || entry.minutes > 150) errors.push('Spielminuten: ganze Zahl von 0 bis 150');
+    if (entry.minutes !== null && (!Number.isInteger(entry.minutes) || entry.minutes < 0 || entry.minutes > 150)) {
+      errors.push('Spielminuten: ganze Zahl von 0 bis 150');
+    }
   } else if (entry.kind === 'training') {
     if (entry.minutes !== null) errors.push('Training hat keine Spielminuten');
   } else {

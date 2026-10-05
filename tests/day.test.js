@@ -3,12 +3,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateFootball, validateBodyweight, bodyweightHistory, bodyweightChange } from '../js/entries.js';
 
-test('Fußball: Match braucht Spielminuten, Training nicht', () => {
+test('Fußball: Match mit Spielminuten oder noch ohne, Training ohne', () => {
   assert.deepEqual(validateFootball({ date: '2026-10-09', kind: 'match', minutes: 90 }), []);
   assert.deepEqual(validateFootball({ date: '2026-10-09', kind: 'match', minutes: 0 }), []);
-  assert.equal(validateFootball({ date: '2026-10-09', kind: 'match', minutes: null }).length, 1);
+  assert.deepEqual(validateFootball({ date: '2026-10-09', kind: 'match', minutes: null }), [], 'abgehakt, Minuten folgen');
   assert.equal(validateFootball({ date: '2026-10-09', kind: 'match', minutes: 200 }).length, 1);
   assert.equal(validateFootball({ date: '2026-10-09', kind: 'match', minutes: 45.5 }).length, 1);
+  assert.equal(validateFootball({ date: '2026-10-09', kind: 'match', minutes: NaN }).length, 1);
   assert.deepEqual(validateFootball({ date: '2026-10-07', kind: 'training', minutes: null }), []);
   assert.equal(validateFootball({ date: '2026-10-07', kind: 'x', minutes: null }).length, 1);
 });
