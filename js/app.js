@@ -23,6 +23,7 @@ const state = {
   openDay: null,      // im Wochenplan aufgeklappter Tag
   matchPending: null, // Datum, an dem "Match" angetippt, aber noch nicht gespeichert ist
   error: null,        // Fehlermeldung (Speichern/Anmelden), oben eingeblendet
+  footballOther: null, // Datum, an dem auch die nicht geplante Fußball-Art angezeigt wird
 };
 
 const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -191,62 +192,88 @@ function sessionChooser(day) {
   );
 }
 
-// Fußball an diesem Tag: Training oder Match (mit Spielminuten). Nochmal tippen entfernt.
+// Fußball an diesem Tag – gleiche Bedienung wie bei den Übungen: Kreis antippen = gemacht.
+// Angezeigt wird, was laut Plan dran ist (Training oder Match). An freien Tagen oder wenn es
+// anders kam, lässt sich die andere Art über den kleinen Link darunter eintragen.
+function footballRow(kind, entry) {
+  const done = entry?.kind === kind;
+  const editing = kind === 'match' && state.matchPending === state.date;
+
+  function toggle() {
+    if (done) {
+      deleteDayEntry('football', state.date);
+    } else if (kind === 'training') {
+      saveDayEntry({ type: 'football', date: state.date, kind: 'training', minutes: null });
+    } else {
+      state.matchPending = state.date; // bei Match zuerst die Spielminuten abfragen
+    }
+    render();
+  }
+
+  const row = h('div', { class: `row${done ? ' done' : ''}${editing ? ' editing' : ''}` },
+    h('div', { class: 'row-main' },
+      h('button', {
+        class: `check${done ? ' checked' : ''}`,
+        'aria-label': done ? 'Zurücknehmen' : 'Als gemacht markieren',
+        onclick: toggle,
+      }),
+      h('div', { class: 'row-text' },
+        h('div', { class: 'row-name' }, kind === 'match' ? 'Match' : 'Fußballtraining'),
+        done && kind === 'match' ? h('div', { class: 'row-values' }, `${entry.minutes} Spielminuten`) : null,
+      ),
+      done && kind === 'match' && !editing
+        ? h('button', { class: 'btn-text', onclick: () => { state.matchPending = state.date; render(); } }, 'Ändern')
+        : null,
+    ),
+  );
+  if (!editing) return row;
+
+  const minutes = h('input', { type: 'text', inputmode: 'numeric', value: done ? entry.minutes : '', placeholder: 'z. B. 70' });
+  const message = h('div', { class: 'error' });
+  row.append(h('div', { class: 'edit' },
+    h('div', { class: 'fields' }, h('label', { class: 'field' }, h('span', {}, 'Spielminuten'), minutes)),
+    message,
+    h('div', { class: 'edit-actions' },
+      h('button', { class: 'btn-secondary', onclick: () => { state.matchPending = null; render(); } }, 'Abbrechen'),
+      h('button', {
+        class: 'btn-primary',
+        onclick: () => {
+          const newEntry = { type: 'football', date: state.date, kind: 'match', minutes: parseNumber(minutes.value) };
+          const errors = validateFootball(newEntry);
+          if (errors.length) {
+            message.textContent = errors.join(' · ');
+            return;
+          }
+          saveDayEntry(newEntry);
+          state.matchPending = null;
+          render();
+        },
+      }, 'Speichern'),
+    ),
+  ));
+  return row;
+}
+
 function footballCard(day, entries) {
   const entry = entries.find((e) => e.type === 'football' && e.date === state.date);
-  const matchOpen = entry?.kind === 'match' || state.matchPending === state.date;
-  const planned = { training: 'laut Plan: Training', match: 'laut Plan: Match' }[day.football] ?? null;
-
-  function tapTraining() {
-    if (entry?.kind === 'training') deleteDayEntry('football', state.date);
-    else saveDayEntry({ type: 'football', date: state.date, kind: 'training', minutes: null });
-    state.matchPending = null;
-    render();
+  const showOther = state.footballOther === state.date;
+  // Welche Zeilen? Eingetragenes zuerst, sonst laut Plan; "andere Art" nur auf Wunsch
+  const kinds = [];
+  const main = entry?.kind ?? day.football;
+  if (main) kinds.push(main);
+  if (showOther || !main) {
+    for (const k of ['training', 'match']) if (!kinds.includes(k)) kinds.push(k);
   }
+  const other = main === 'training' ? 'Match' : 'Training';
 
-  function tapMatch() {
-    if (entry?.kind === 'match' || state.matchPending === state.date) {
-      if (entry?.kind === 'match') deleteDayEntry('football', state.date);
-      state.matchPending = null;
-    } else {
-      state.matchPending = state.date; // erst Spielminuten eingeben, dann speichern
-    }
-    render();
-  }
-
-  const minutes = h('input', { type: 'text', inputmode: 'numeric', value: entry?.kind === 'match' ? entry.minutes : '', placeholder: 'z. B. 70' });
-  const message = h('div', { class: 'error' });
-
-  function saveMatch() {
-    const newEntry = { type: 'football', date: state.date, kind: 'match', minutes: parseNumber(minutes.value) };
-    const errors = validateFootball(newEntry);
-    if (errors.length) {
-      message.textContent = errors.join(' · ');
-      return;
-    }
-    saveDayEntry(newEntry);
-    state.matchPending = null;
-    render();
-  }
-
-  return h('div', { class: 'card' },
-    h('div', { class: 'card-head' },
-      h('span', { class: 'card-title' }, 'Fußball'),
-      planned ? h('span', { class: 'muted' }, planned) : null,
-    ),
-    h('div', { class: 'options' },
-      h('button', { class: `option${entry?.kind === 'training' ? ' selected' : ''}`, onclick: tapTraining }, 'Training'),
-      h('button', { class: `option${matchOpen ? ' selected' : ''}`, onclick: tapMatch }, 'Match'),
-    ),
-    matchOpen ? h('div', { class: 'inline-form' },
-      h('label', { class: 'field' }, h('span', {}, 'Spielminuten'), minutes),
-      h('button', { class: 'btn-primary', onclick: saveMatch }, entry?.kind === 'match' ? 'Ändern' : 'Speichern'),
-    ) : null,
-    message,
-    entry ? h('div', { class: 'saved-note' },
-      entry.kind === 'match' ? `Match gespeichert · ${entry.minutes} Min.` : 'Training gespeichert',
-      ' · nochmal tippen zum Entfernen') : null,
-  );
+  return [
+    !main && !showOther
+      ? h('button', { class: 'btn-text center', onclick: () => { state.footballOther = state.date; render(); } }, 'Fußball eintragen')
+      : h('div', { class: 'card list' }, kinds.map((k) => footballRow(k, entry))),
+    main && !showOther && !entry
+      ? h('button', { class: 'btn-text center', onclick: () => { state.footballOther = state.date; render(); } }, `Stattdessen ${other} eintragen`)
+      : null,
+  ];
 }
 
 function renderTraining() {
