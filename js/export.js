@@ -35,7 +35,8 @@ function otherRow(e) {
 
 // Alle Einträge → CSV-Text, nach Datum sortiert (ohne BOM; das hängt der Download davor)
 export function toCSV(entries) {
-  const sorted = [...entries].sort((a, b) => (a.date + (a.createdAt ?? '')).localeCompare(b.date + (b.createdAt ?? '')));
+  // Nur Einträge mit Datum (Training, Fußball, Gewicht) – nicht die Definitionen eigener Übungen
+  const sorted = entries.filter((e) => e.type !== 'exercise').sort((a, b) => (a.date + (a.createdAt ?? '')).localeCompare(b.date + (b.createdAt ?? '')));
   const rows = sorted.map((e) => (e.type === 'gym' ? gymRow(e) : otherRow(e)));
   return [COLUMNS, ...rows].map((row) => row.map(cell).join(';')).join('\r\n') + '\r\n';
 }

@@ -2,7 +2,7 @@
 // Strategie "Netz zuerst": online immer die neueste Version laden (und Kopie ablegen),
 // offline oder bei sehr langsamem Netz die abgelegte Kopie verwenden.
 // Die Daten selbst speichert Firestore – hier geht es nur um die App-Dateien.
-const CACHE = 'gym-tracker-v2';
+const CACHE = 'gym-tracker-v3';
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0/';
 const ASSETS = [
   './',
@@ -14,6 +14,8 @@ const ASSETS = [
   './js/entries.js',
   './js/store.js',
   './js/export.js',
+  './js/week.js',
+  './js/custom.js',
   './js/firebase-config.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

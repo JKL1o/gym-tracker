@@ -1,14 +1,17 @@
 // Oberfläche: Training eintragen, Wochenplan, Daten-Export.
-import { EXERCISES, SESSIONS, plannedWeek, mondayOf, toISODate } from './plan.js';
+import { EXERCISES, SESSIONS, plannedWeek, mondayOf, toISODate, applyCustomExercises } from './plan.js';
 import {
   defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay,
   validateFootball, validateBodyweight, bodyweightHistory, bodyweightChange,
 } from './entries.js';
 import {
   loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry,
+  saveGymEntries, deleteGymEntries, saveCustomExercise,
   initStore, onChange, onError, status, signIn, signOut,
 } from './store.js';
 import { toCSV } from './export.js';
+import { isoWeek, weekSummary } from './week.js';
+import { LOAD_TYPES, validateCustomExercise, newExerciseKey } from './custom.js';
 
 const view = document.getElementById('view');
 // "Heute" – wird beim Zurückkehren in die App neu bestimmt (siehe unten), damit eine
@@ -24,6 +27,7 @@ const state = {
   matchPending: null, // Datum, an dem "Match" angetippt, aber noch nicht gespeichert ist
   error: null,        // Fehlermeldung (Speichern/Anmelden), oben eingeblendet
   footballOther: null, // Datum, an dem auch die nicht geplante Fußball-Art angezeigt wird
+  adding: false,       // Formular "Übung hinzufügen" offen
 };
 
 const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -83,8 +87,11 @@ function weekNav(week) {
   return h('div', { class: 'week-nav' },
     h('button', { class: 'icon-btn', 'aria-label': 'Vorige Woche', onclick: () => shiftDate(-7) }, '‹'),
     h('div', { class: 'week-label' },
-      `${shortDate(week.days[0].date)} – ${shortDate(week.days[6].date)}`,
-      week.days.some((d) => d.date === TODAY) ? h('span', { class: 'pill' }, 'Diese Woche') : null,
+      h('div', { class: 'week-kw' },
+        `KW ${isoWeek(parseISO(week.days[0].date))}`,
+        week.days.some((d) => d.date === TODAY) ? h('span', { class: 'pill' }, 'Diese Woche') : null,
+      ),
+      h('div', { class: 'week-range' }, `${shortDate(week.days[0].date)} – ${shortDate(week.days[6].date)}`),
     ),
     h('button', { class: 'icon-btn', 'aria-label': 'Nächste Woche', onclick: () => shiftDate(7) }, '›'),
   );
@@ -144,8 +151,7 @@ function exerciseRow(sessionId, item, entries) {
       h('div', { class: 'row-text' },
         h('div', { class: 'row-name' }, ex.name),
         h('div', { class: 'row-values' }, formatEntry({ exercise: item.ex, ...values })),
-        h('div', { class: 'row-plan' }, `Plan ${item.sets} × ${item.reps} · ${item.kg}`,
-          item.estimate ? ' (geschätzt)' : '', ex.note ? ` · ${ex.note}` : ''),
+        h('div', { class: 'row-plan' }, `Plan ${item.sets} × ${item.reps} · ${item.kg}`, ex.note ? ` · ${ex.note}` : ''),
       ),
       editing ? null : h('button', { class: 'btn-text', onclick: () => { state.editing = item.ex; render(); } }, 'Ändern'),
     ),
@@ -174,9 +180,96 @@ function exerciseRow(sessionId, item, entries) {
           },
         }, 'Speichern'),
       ),
+      // Nur selbst angelegte Übungen lassen sich aus dem Plan entfernen (die aus Gym.md nicht)
+      item.custom ? h('button', {
+        class: 'btn-text danger center',
+        onclick: () => {
+          if (!confirm(`"${ex.name}" aus dem Plan entfernen? Bisherige Einträge bleiben erhalten.`)) return;
+          const def = entries.find((e) => e.type === 'exercise' && e.key === item.ex);
+          if (def) saveCustomExercise({ ...def, archived: true });
+          state.editing = null;
+          render();
+        },
+      }, 'Aus Plan entfernen') : null,
     ),
   );
   return row;
+}
+
+// Schalter "Alles erledigt": hakt alle offenen Übungen mit den angezeigten Werten ab.
+// Ausschalten entfernt alle Haken dieser Einheit an diesem Tag (mit Rückfrage).
+function allDoneRow(sessionId, session, entries, doneCount) {
+  const all = doneCount === session.items.length;
+  function toggle() {
+    const isDone = (ex) => entries.some((e) => e.type === 'gym' && e.exercise === ex && e.date === state.date);
+    if (all) {
+      if (!confirm(`Alle ${session.items.length} Haken entfernen?`)) return;
+      deleteGymEntries(state.date, session.items.map((i) => i.ex));
+    } else {
+      saveGymEntries(session.items.filter((i) => !isDone(i.ex)).map((i) => {
+        const v = defaultsFor(sessionId, i.ex, entries);
+        return { type: 'gym', date: state.date, session: sessionId, exercise: i.ex, sets: v.sets, reps: v.reps, weight: v.weight };
+      }));
+    }
+    state.editing = null;
+    render();
+  }
+  return h('div', { class: 'all-done' },
+    h('span', {}, 'Alles erledigt'),
+    h('button', {
+      class: `switch${all ? ' on' : ''}`, role: 'switch', 'aria-checked': all ? 'true' : 'false',
+      'aria-label': 'Alles erledigt', onclick: toggle,
+    }),
+  );
+}
+
+// Formular: neue Übung dauerhaft zur Einheit hinzufügen
+function addExerciseCard(sessionId) {
+  const session = SESSIONS[sessionId];
+  const name = h('input', { type: 'text', maxlength: '40', placeholder: 'z. B. Cable Crunch' });
+  const load = h('select', {}, Object.entries(LOAD_TYPES).map(([k, label]) => h('option', { value: k }, label)));
+  const sets = numberField('Sätze', 3, 'numeric');
+  const reps = numberField('Wdh.', 10, 'numeric');
+  const weight = numberField('kg', '', 'decimal');
+  const message = h('div', { class: 'error' });
+
+  // Gewichtsfeld passend zur Art beschriften bzw. ausblenden
+  function updateWeight() {
+    weight.el.hidden = load.value === 'none';
+    weight.el.querySelector('span').textContent = { kg: 'kg', kg2: 'kg pro Hand', bw: 'Zusatz-kg' }[load.value] ?? 'kg';
+  }
+  load.addEventListener('change', updateWeight);
+  updateWeight();
+
+  function save() {
+    const c = {
+      key: newExerciseKey(), name: name.value.trim(), session: sessionId, load: load.value,
+      sets: parseNumber(sets.input.value), reps: parseNumber(reps.input.value),
+      weight: load.value === 'none' ? null : parseNumber(weight.input.value),
+    };
+    if (c.load === 'bw' && c.weight === null) c.weight = 0; // leer = nur Körpergewicht
+    const errors = validateCustomExercise(c);
+    if (errors.length) {
+      message.textContent = errors.join(' · ');
+      return;
+    }
+    saveCustomExercise(c);
+    state.adding = false;
+    render();
+  }
+
+  return h('div', { class: 'card' },
+    h('div', { class: 'card-title' }, `Neue Übung für ${session.name}`),
+    h('p', { class: 'muted' }, 'Wird dauerhaft zu dieser Einheit hinzugefügt. Die Werte sind dein Plan.'),
+    h('label', { class: 'field top-gap' }, h('span', {}, 'Name'), name),
+    h('label', { class: 'field top-gap' }, h('span', {}, 'Art'), load),
+    h('div', { class: 'fields top-gap' }, sets.el, reps.el, weight.el),
+    message,
+    h('div', { class: 'edit-actions' },
+      h('button', { class: 'btn-secondary', onclick: () => { state.adding = false; render(); } }, 'Abbrechen'),
+      h('button', { class: 'btn-primary', onclick: save }, 'Hinzufügen'),
+    ),
+  );
 }
 
 function sessionChooser(day) {
@@ -318,7 +411,7 @@ function renderTraining() {
     const cls = ['day', d.date === state.date && 'selected', d.date === TODAY && 'today'].filter(Boolean).join(' ');
     return h('button', {
       class: cls,
-      onclick: () => { state.date = d.date; state.editing = null; state.choosing = false; render(); },
+      onclick: () => { state.date = d.date; state.editing = null; state.choosing = false; state.adding = false; render(); },
     },
     h('span', { class: 'day-name' }, d.dayName),
     h('span', { class: 'day-num' }, parseISO(d.date).getDate()),
@@ -353,8 +446,16 @@ function renderTraining() {
         h('span', { class: 'muted' }, `${doneCount} / ${session.items.length}`),
       ),
       session.note ? h('div', { class: 'note' }, session.note) : null,
-      h('div', { class: 'card list' }, session.items.map((item) => exerciseRow(sessionId, item, entries))),
-      h('button', { class: 'btn-text center', onclick: () => { state.choosing = true; render(); } }, 'Andere Einheit wählen'),
+      h('div', { class: 'card list' },
+        allDoneRow(sessionId, session, entries, doneCount),
+        session.items.map((item) => exerciseRow(sessionId, item, entries)),
+      ),
+      state.adding
+        ? addExerciseCard(sessionId)
+        : h('div', { class: 'link-row' },
+          h('button', { class: 'btn-text', onclick: () => { state.adding = true; state.editing = null; render(); } }, '+ Übung hinzufügen'),
+          h('button', { class: 'btn-text', onclick: () => { state.choosing = true; render(); } }, 'Andere Einheit wählen'),
+        ),
     );
   }
   parts.push(h('div', { class: 'gap' }), footballCard(day, entries));
@@ -363,12 +464,51 @@ function renderTraining() {
 
 // ---------- Woche ----------
 
+// Kleine Statusmarke: erledigt (grün), teilweise (gelb), ausgefallen (rot)
+function badge(status, text) {
+  return h('span', { class: `badge ${status}` }, text);
+}
+
+function gymBadge(g) {
+  if (g.status === 'done') return badge('done', `${g.done}/${g.total}`);
+  if (g.status === 'partial') return badge('partial', `${g.done}/${g.total}`);
+  if (g.status === 'missed') return badge('missed', 'ausgefallen');
+  return null;
+}
+
+function footballLine(f) {
+  const name = f.kind === 'match' ? 'Match' : 'Fußballtraining';
+  const detail = f.kind === 'match' && f.status === 'done'
+    ? (f.minutes === null ? ' · Minuten fehlen' : ` · ${f.minutes} Min.`)
+    : '';
+  return h('div', { class: 'week-line' },
+    h('span', { class: f.status === 'open' ? 'muted' : '' }, name + detail),
+    f.status === 'done' ? badge('done', 'erledigt') : f.status === 'missed' ? badge('missed', 'ausgefallen') : null,
+    f.status === 'done' && !f.planned ? badge('extra', 'nicht laut Plan') : null,
+  );
+}
+
 function renderWeek() {
   const week = weekOf(state.date);
+  const entries = loadEntries();
+  const sum = weekSummary(week.days, entries, TODAY);
+  const weekOver = week.days[6].date < TODAY;
+  const missedText = (m) => `${m.dayName} ${m.what === 'gym' ? SESSIONS[m.session]?.name ?? 'Gym' : m.what === 'match' ? 'Match' : 'Fußballtraining'}`;
 
-  const list = h('div', { class: 'card list' }, week.days.map((d, i) => {
+  const summary = h('div', { class: 'card' },
+    h('div', { class: 'stats' },
+      h('div', {}, h('div', { class: 'stat-num small-num' }, `${sum.gymDone} / ${sum.gymPlanned}`), h('div', { class: 'muted' }, 'Gym-Einheiten')),
+      h('div', {}, h('div', { class: 'stat-num small-num' }, `${sum.footballDone} / ${sum.footballPlanned}`), h('div', { class: 'muted' }, 'Fußball')),
+    ),
+    sum.missed.length
+      ? h('div', { class: 'missed' }, h('strong', {}, 'Ausgefallen: '), sum.missed.map(missedText).join(', '))
+      : h('div', { class: 'muted' }, weekOver ? 'Nichts ausgefallen.' : 'Bisher nichts ausgefallen.'),
+  );
+
+  const list = h('div', { class: 'card list' }, sum.statuses.map((s) => {
+    const d = s.day;
     const open = state.openDay === d.date;
-    const session = d.gym ? SESSIONS[d.gym] : null;
+    const session = s.gym ? SESSIONS[s.gym.session] : null;
     return h('div', { class: `week-row${d.date === TODAY ? ' today' : ''}` },
       h('button', {
         class: 'week-row-main',
@@ -377,8 +517,13 @@ function renderWeek() {
       },
       h('div', { class: 'week-day' }, h('span', { class: 'day-name' }, d.dayName), h('span', {}, parseISO(d.date).getDate())),
       h('div', { class: 'week-content' },
-        h('div', { class: session ? 'row-name' : 'muted' }, session ? session.name : (d.football ? 'Kein Gym' : 'Frei')),
-        h('div', { class: 'chips' }, footballChip(d.football)),
+        session
+          ? h('div', { class: 'week-line' },
+            h('span', { class: 'row-name' }, session.name),
+            gymBadge(s.gym),
+            !s.gym.planned ? badge('extra', 'nicht laut Plan') : null)
+          : (s.football ? null : h('div', { class: 'muted' }, 'Frei')),
+        s.football ? footballLine(s.football) : null,
       ),
       session ? h('span', { class: `chevron${open ? ' open' : ''}` }, '›') : null),
       open ? h('div', { class: 'plan-list' },
@@ -391,10 +536,7 @@ function renderWeek() {
     );
   }));
 
-  return [
-    weekNav(week),
-    list,
-  ];
+  return [weekNav(week), summary, list];
 }
 
 // ---------- Daten ----------
@@ -511,6 +653,8 @@ function renderContent() {
     return renderGate('Gym-Tracker', 'Melde dich mit deinem Google-Konto an. Deine Daten sind dann auf Handy und PC gleich.',
       h('button', { class: 'btn-primary', onclick: () => signIn() }, 'Mit Google anmelden'));
   }
+  // Selbst angelegte Übungen in den Plan einhängen, bevor irgendetwas angezeigt wird
+  applyCustomExercises(loadEntries().filter((e) => e.type === 'exercise'));
   return state.tab === 'woche' ? renderWeek()
     : state.tab === 'daten' ? renderData()
     : renderTraining();

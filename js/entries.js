@@ -89,6 +89,7 @@ export function formatEntry(entry) {
 // Duplikate, auch nicht, wenn Handy und PC offline beide etwas eintragen.
 export function entryDocId(entry) {
   if (entry.type === 'gym') return `gym_${entry.date}_${entry.exercise}`;
+  if (entry.type === 'exercise') return `exercise_${entry.key}`; // selbst angelegte Übung
   return `${entry.type}_${entry.date}`;
 }
 

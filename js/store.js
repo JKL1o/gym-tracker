@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, setDoc, deleteDoc, onSnapshot,
+  collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { entryDocId } from './entries.js';
@@ -120,4 +120,32 @@ export function saveDayEntry(entry) {
 
 export function deleteDayEntry(type, date) {
   remove(entryDocId({ type, date }));
+}
+
+// Mehrere Einträge auf einmal ("Alles erledigt"): ein Schreibvorgang statt vieler einzelner
+function prepared(entry) {
+  const id = entryDocId(entry);
+  const existing = cache.find((e) => e.id === id);
+  const now = new Date().toISOString();
+  return { id, data: { ...entry, id, createdAt: existing?.createdAt ?? now, updatedAt: existing ? now : undefined } };
+}
+
+export function saveGymEntries(entries) {
+  const batch = writeBatch(db);
+  for (const entry of entries) {
+    const { id, data } = prepared(entry);
+    batch.set(entryRef(id), data);
+  }
+  batch.commit().catch((err) => errorListener(`Speichern fehlgeschlagen: ${err.message}`));
+}
+
+export function deleteGymEntries(date, exercises) {
+  const batch = writeBatch(db);
+  for (const exercise of exercises) batch.delete(entryRef(entryDocId({ type: 'gym', date, exercise })));
+  batch.commit().catch((err) => errorListener(`Löschen fehlgeschlagen: ${err.message}`));
+}
+
+// Eigene Übung anlegen oder ändern (z. B. archived: true = aus dem Plan entfernen)
+export function saveCustomExercise(exercise) {
+  write({ ...exercise, type: 'exercise' });
 }

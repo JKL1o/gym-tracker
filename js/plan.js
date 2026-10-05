@@ -162,3 +162,33 @@ export function plannedWeek(type, monday) {
     return { date: toISODate(date), dayName: DAY_NAMES[i], gym: day.gym, football: day.football };
   });
 }
+
+// ---------- Selbst angelegte Übungen ----------
+// Werden in der Datenbank gespeichert (type 'exercise') und beim Laden hier eingehängt,
+// damit der Rest der App sie wie Übungen aus Gym.md behandelt.
+const BASE_EXERCISE_IDS = new Set(Object.keys(EXERCISES));
+const BASE_ITEMS = Object.fromEntries(Object.entries(SESSIONS).map(([id, s]) => [id, [...s.items]]));
+
+// Planwert als Text, im selben Format wie Gym.md (damit die Vorbelegung ihn lesen kann)
+export function planWeightText(load, weight) {
+  const n = String(weight ?? 0).replace('.', ',');
+  if (load === 'none') return '—';
+  if (load === 'bw') return weight > 0 ? `+${n} kg` : 'KG';
+  if (load === 'kg2') return `2 × ${n} kg`;
+  return `${n} kg`;
+}
+
+// customs: Liste der gespeicherten eigenen Übungen. Entfernte (archived) bleiben im Katalog,
+// damit alte Einträge weiter ihren Namen haben, erscheinen aber in keiner Einheit mehr.
+export function applyCustomExercises(customs) {
+  for (const id of Object.keys(EXERCISES)) if (!BASE_EXERCISE_IDS.has(id)) delete EXERCISES[id];
+  for (const [id, items] of Object.entries(BASE_ITEMS)) SESSIONS[id].items = [...items];
+  const sorted = [...customs].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+  for (const c of sorted) {
+    EXERCISES[c.key] = { name: c.name, load: c.load, unit: 'Wdh', custom: true };
+    if (c.archived || !SESSIONS[c.session]) continue;
+    SESSIONS[c.session].items.push({
+      ex: c.key, kg: planWeightText(c.load, c.weight), sets: String(c.sets), reps: String(c.reps), pause: '', custom: true,
+    });
+  }
+}
