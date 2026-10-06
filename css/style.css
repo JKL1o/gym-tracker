@@ -15,6 +15,9 @@
   --error: #dc2626;
   --radius: 14px;
   --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 1px 8px rgba(17, 24, 39, 0.04);
+  /* Diagrammfarben – geprüft auf Farbenblindheit und Kontrast (dataviz-Validator) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
 }
 
 * { box-sizing: border-box; }
@@ -358,3 +361,49 @@ nav#tabs[hidden] { display: none; }
 .badge.missed { background: #fef2f2; color: var(--error); }
 .badge.extra { background: #f3f4f6; color: var(--muted); }
 .missed { color: var(--error); font-size: 0.9rem; }
+
+/* ---------- Verlauf (Diagramme) ---------- */
+.chart { position: relative; margin-top: 6px; touch-action: pan-y; }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-grid { stroke: #eceae4; stroke-width: 1; }
+.chart-base { stroke: #c3c2b7; stroke-width: 1; }
+.chart-axis { fill: #898781; font-size: 10px; font-variant-numeric: tabular-nums; }
+.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { stroke: var(--card); stroke-width: 2; }
+.chart-dot-focus { stroke: var(--card); stroke-width: 2; pointer-events: none; }
+.chart-cross { stroke: #c3c2b7; stroke-width: 1; pointer-events: none; }
+.chart-end-label { fill: var(--text); font-size: 11px; font-weight: 600; }
+.chart-hit { cursor: crosshair; }
+.chart-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--text);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  padding: 6px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.chart-tip[hidden] { display: none; }
+.chart-tip-title { font-weight: 600; }
+.chart-select {
+  width: 100%;
+  margin: 4px 0 2px;
+  padding: 10px;
+  height: 44px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+}
+.chart-sub { margin-top: 4px; font-size: 0.8rem; }
+.chart-empty { margin: 8px 0 4px; }
+.chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 0.85rem; margin: 2px 0 4px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 3px; }
+.chart-table { margin-top: 8px; font-size: 0.85rem; }
+.chart-table summary { color: var(--accent); }
+.chart-table td, .chart-table th { font-variant-numeric: tabular-nums; }

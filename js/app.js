@@ -12,6 +12,8 @@ import {
 import { toCSV } from './export.js';
 import { isoWeek, weekSummary } from './week.js';
 import { LOAD_TYPES, validateCustomExercise, newExerciseKey } from './custom.js';
+import { exercisesWithData, exerciseSeries, bodyweightSeries, weeklyCounts } from './charts-data.js';
+import { lineChart, columnChart } from './chart.js';
 
 const view = document.getElementById('view');
 // "Heute" – wird beim Zurückkehren in die App neu bestimmt (siehe unten), damit eine
@@ -28,6 +30,7 @@ const state = {
   error: null,        // Fehlermeldung (Speichern/Anmelden), oben eingeblendet
   footballOther: null, // Datum, an dem auch die nicht geplante Fußball-Art angezeigt wird
   adding: false,       // Formular "Übung hinzufügen" offen
+  chartExercise: null, // im Verlauf ausgewählte Übung
 };
 
 const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -539,6 +542,74 @@ function renderWeek() {
   return [weekNav(week), summary, list];
 }
 
+// ---------- Verlauf (Diagramme) ----------
+
+// Werte zusätzlich als Tabelle (zum Nachlesen, falls das Diagramm schwer lesbar ist)
+function valueTable(head, rows) {
+  return h('details', { class: 'chart-table' },
+    h('summary', {}, 'Werte als Tabelle'),
+    h('table', {},
+      h('tr', {}, head.map((t) => h('th', {}, t))),
+      rows.map((r) => h('tr', {}, r.map((c) => h('td', {}, c)))),
+    ),
+  );
+}
+
+const UNIT_TEXT = { kg: 'Gewicht in kg', kg2: 'Gewicht pro Hand in kg', bw: 'Zusatzgewicht in kg' };
+
+function renderCharts() {
+  const entries = loadEntries();
+  const exercises = exercisesWithData(entries);
+  if (!exercises.some((e) => e.id === state.chartExercise)) state.chartExercise = exercises[0]?.id ?? null;
+  const empty = (text) => h('p', { class: 'muted chart-empty' }, text);
+
+  // 1. Gewicht pro Übung
+  const select = h('select', { class: 'chart-select', onchange: (e) => { state.chartExercise = e.target.value; render(); } },
+    exercises.map((ex) => {
+      const o = h('option', { value: ex.id }, ex.name);
+      o.selected = ex.id === state.chartExercise;
+      return o;
+    }));
+  const current = exercises.find((e) => e.id === state.chartExercise);
+  const series = current ? exerciseSeries(entries, current.id) : [];
+  const exerciseCard = h('div', { class: 'card' },
+    h('div', { class: 'card-title' }, 'Gewicht pro Übung'),
+    exercises.length ? [
+      select,
+      h('div', { class: 'muted chart-sub' }, UNIT_TEXT[current.load]),
+      lineChart(series, { tipLines: (p) => [`${p.sets} × ${String(p.reps).replace('.', ',')}`] }),
+      valueTable(['Datum', 'kg', 'Sätze × Wdh.'],
+        [...series].reverse().map((p) => [longDate(p.date), formatNumber(p.value), `${p.sets} × ${formatNumber(p.reps)}`])),
+    ] : empty('Noch keine Übung mit Gewicht eingetragen.'),
+  );
+
+  // 2. Körpergewicht
+  const bw = bodyweightSeries(entries);
+  const bodyCard = h('div', { class: 'card' },
+    h('div', { class: 'card-title' }, 'Körpergewicht'),
+    bw.length ? [
+      h('div', { class: 'muted chart-sub' }, 'in kg'),
+      lineChart(bw),
+      valueTable(['Datum', 'kg'], [...bw].reverse().map((p) => [longDate(p.date), formatNumber(p.value)])),
+    ] : empty('Noch keine Messung – eintragen im Tab Daten.'),
+  );
+
+  // 3. Einheiten pro Woche (letzte 8 Wochen)
+  const weeks = weeklyCounts(entries, TODAY, 8);
+  const seriesDef = [{ name: 'Gym', color: 'var(--series-1)' }, { name: 'Fußball', color: 'var(--series-2)' }];
+  const weekCard = h('div', { class: 'card' },
+    h('div', { class: 'card-title' }, 'Einheiten pro Woche'),
+    h('div', { class: 'chart-legend' },
+      seriesDef.map((sd) => h('span', { class: 'legend-item' }, h('span', { class: 'legend-swatch', style: `background:${sd.color}` }), sd.name)),
+      h('span', { class: 'muted' }, '· Zahlen unten = KW'),
+    ),
+    columnChart(weeks.map((w) => ({ label: String(w.kw), title: `KW ${w.kw}`, values: [w.gym, w.football] })), seriesDef),
+    valueTable(['KW', 'Gym', 'Fußball'], [...weeks].reverse().map((w) => [w.kw, w.gym, w.football])),
+  );
+
+  return [h('h1', { class: 'page-title' }, 'Verlauf'), exerciseCard, bodyCard, weekCard];
+}
+
 // ---------- Daten ----------
 
 function downloadCSV(entries) {
@@ -656,6 +727,7 @@ function renderContent() {
   // Selbst angelegte Übungen in den Plan einhängen, bevor irgendetwas angezeigt wird
   applyCustomExercises(loadEntries().filter((e) => e.type === 'exercise'));
   return state.tab === 'woche' ? renderWeek()
+    : state.tab === 'verlauf' ? renderCharts()
     : state.tab === 'daten' ? renderData()
     : renderTraining();
 }
