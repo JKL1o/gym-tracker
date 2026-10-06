@@ -407,3 +407,7 @@ nav#tabs[hidden] { display: none; }
 .chart-table { margin-top: 8px; font-size: 0.85rem; }
 .chart-table summary { color: var(--accent); }
 .chart-table td, .chart-table th { font-variant-numeric: tabular-nums; }
+
+.chart-table table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.chart-table th, .chart-table td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); }
+.chart-table th { color: var(--muted); font-weight: 500; }

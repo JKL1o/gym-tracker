@@ -53,3 +53,18 @@ test('Runde Achsenwerte', () => {
   const one = niceTicks(40, 40);
   assert.ok(one[0] < 40 && one.at(-1) > 40, 'ein einzelner Wert liegt zwischen den Ticks');
 });
+
+test('Achse geht bei Gewichten nie unter 0 (Fehler: Dips mit 0 kg zeigten -1 bis 1)', () => {
+  assert.ok(niceTicks(0, 0).every((t) => t >= 0));
+  assert.ok(niceTicks(0, 0).length >= 2);
+});
+
+test('Körpergewicht-Übung ohne Zusatzgewicht zeigt Wiederholungen, sonst Gewicht', async () => {
+  const { exerciseMetric } = await import('../js/charts-data.js');
+  const dips = [{ date: '2026-10-05', value: 0, sets: 3, reps: 8 }, { date: '2026-10-07', value: 0, sets: 3, reps: 10 }];
+  const m = exerciseMetric(dips, 'bw');
+  assert.deepEqual([m.unit, m.points.map((p) => p.value)], ['Wdh.', [8, 10]]);
+  const klimm = [{ date: '2026-10-05', value: 2.5, sets: 4, reps: 6 }];
+  assert.equal(exerciseMetric(klimm, 'bw').unit, 'kg');
+  assert.equal(exerciseMetric(klimm, 'kg2').label, 'Gewicht pro Hand in kg');
+});

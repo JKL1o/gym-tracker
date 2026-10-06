@@ -92,3 +92,14 @@ test('Feste IDs: gleicher Tag + Übung = gleiche ID, sonst verschieden', async (
   assert.equal(entryDocId({ type: 'bodyweight', date: '2026-10-09', kg: 68 }), 'bodyweight_2026-10-09');
   assert.notEqual(entryDocId({ type: 'football', date: '2026-10-09' }), entryDocId({ type: 'bodyweight', date: '2026-10-09' }));
 });
+
+test('Per "Ändern" gespeicherte Werte gelten dauerhaft – auch nach Zurücknehmen des Hakens', async () => {
+  const { defaultsFor, entryDocId } = await import('../js/entries.js');
+  const target = { type: 'target', exercise: 'klimmzuege', sets: 4, reps: 7, weight: 5 };
+  // kein Training mehr eingetragen (Haken zurückgenommen) → trotzdem die geänderten Werte
+  assert.deepEqual(defaultsFor('oka', 'klimmzuege', [target]), { sets: 4, reps: 7, weight: 5 });
+  // gespeicherte Werte haben Vorrang vor dem letzten Training
+  const older = { type: 'gym', exercise: 'klimmzuege', date: '2026-10-01', createdAt: 'a', sets: 4, reps: 5, weight: 2.5 };
+  assert.deepEqual(defaultsFor('oka', 'klimmzuege', [older, target]), { sets: 4, reps: 7, weight: 5 });
+  assert.equal(entryDocId(target), 'target_klimmzuege');
+});

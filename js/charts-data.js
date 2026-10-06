@@ -53,6 +53,7 @@ export function weeklyCounts(entries, today, weeks = 8) {
 
 // Runde Achsenwerte zwischen min und max, z. B. 40 / 45 / 50 (etwa `count` Stück)
 export function niceTicks(min, max, count = 4) {
+  const nonNegative = min >= 0; // Gewichte/Wiederholungen: Achse nie unter 0
   if (min === max) {
     const pad = Math.max(1, Math.abs(min) * 0.05);
     min -= pad;
@@ -65,5 +66,15 @@ export function niceTicks(min, max, count = 4) {
   const end = Math.ceil(max / step) * step;
   const ticks = [];
   for (let v = start; v <= end + step / 1000; v += step) ticks.push(Math.round(v * 1000) / 1000);
-  return ticks;
+  return nonNegative ? ticks.filter((t) => t >= 0) : ticks;
+}
+
+// Was zeigt das Übungsdiagramm? Normal das Gewicht. Bei Körpergewicht-Übungen ohne jedes
+// Zusatzgewicht (z. B. Dips immer mit 0 kg) wäre das eine flache Linie bei 0 – dann die Wiederholungen.
+export function exerciseMetric(series, load) {
+  if (load === 'bw' && series.every((p) => p.value === 0)) {
+    return { points: series.map((p) => ({ ...p, value: p.reps })), unit: 'Wdh.', label: 'Wiederholungen (nur Körpergewicht)', header: 'Wdh.' };
+  }
+  const label = { kg: 'Gewicht in kg', kg2: 'Gewicht pro Hand in kg', bw: 'Zusatzgewicht in kg' }[load];
+  return { points: series, unit: 'kg', label, header: 'kg' };
 }

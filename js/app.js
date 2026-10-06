@@ -6,13 +6,13 @@ import {
 } from './entries.js';
 import {
   loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry,
-  saveGymEntries, deleteGymEntries, saveCustomExercise,
+  saveGymEntries, deleteGymEntries, saveCustomExercise, saveTarget,
   initStore, onChange, onError, status, signIn, signOut,
 } from './store.js';
 import { toCSV } from './export.js';
 import { isoWeek, weekSummary } from './week.js';
 import { LOAD_TYPES, validateCustomExercise, newExerciseKey } from './custom.js';
-import { exercisesWithData, exerciseSeries, bodyweightSeries, weeklyCounts } from './charts-data.js';
+import { exercisesWithData, exerciseSeries, exerciseMetric, bodyweightSeries, weeklyCounts } from './charts-data.js';
 import { lineChart, columnChart } from './chart.js';
 
 const view = document.getElementById('view');
@@ -174,12 +174,22 @@ function exerciseRow(sessionId, item, entries) {
         h('button', {
           class: 'btn-primary',
           onclick: () => {
-            const errors = store({
+            // "Ändern" speichert die Werte dauerhaft (auch fürs nächste Mal), hakt aber nicht ab.
+            // Ist die Übung heute schon abgehakt, wird auch der heutige Eintrag angepasst.
+            const v = {
               sets: parseNumber(sets.input.value),
               reps: parseNumber(reps.input.value),
               weight: weight ? parseNumber(weight.input.value) : null,
-            });
-            message.textContent = errors.join(' · ');
+            };
+            const errors = validateGym({ type: 'gym', date: state.date, exercise: item.ex, ...v });
+            if (errors.length) {
+              message.textContent = errors.join(' · ');
+              return;
+            }
+            saveTarget(item.ex, v);
+            if (done) saveGymEntry({ type: 'gym', date: state.date, session: sessionId, exercise: item.ex, ...v });
+            state.editing = null;
+            render();
           },
         }, 'Speichern'),
       ),
@@ -555,8 +565,6 @@ function valueTable(head, rows) {
   );
 }
 
-const UNIT_TEXT = { kg: 'Gewicht in kg', kg2: 'Gewicht pro Hand in kg', bw: 'Zusatzgewicht in kg' };
-
 function renderCharts() {
   const entries = loadEntries();
   const exercises = exercisesWithData(entries);
@@ -571,15 +579,21 @@ function renderCharts() {
       return o;
     }));
   const current = exercises.find((e) => e.id === state.chartExercise);
-  const series = current ? exerciseSeries(entries, current.id) : [];
+  const metric = current ? exerciseMetric(exerciseSeries(entries, current.id), current.load) : null;
+  const onePoint = (n) => (n === 1 ? h('div', { class: 'muted chart-sub' }, 'Erst ein Eintrag – ab dem zweiten entsteht eine Kurve.') : null);
   const exerciseCard = h('div', { class: 'card' },
-    h('div', { class: 'card-title' }, 'Gewicht pro Übung'),
+    h('div', { class: 'card-title' }, 'Fortschritt pro Übung'),
     exercises.length ? [
       select,
-      h('div', { class: 'muted chart-sub' }, UNIT_TEXT[current.load]),
-      lineChart(series, { tipLines: (p) => [`${p.sets} × ${String(p.reps).replace('.', ',')}`] }),
-      valueTable(['Datum', 'kg', 'Sätze × Wdh.'],
-        [...series].reverse().map((p) => [longDate(p.date), formatNumber(p.value), `${p.sets} × ${formatNumber(p.reps)}`])),
+      h('div', { class: 'muted chart-sub' }, metric.label),
+      lineChart(metric.points, {
+        unit: metric.unit,
+        integer: metric.unit === 'Wdh.',
+        tipLines: (p) => [metric.unit === 'kg' ? `${p.sets} × ${formatNumber(p.reps)} Wdh.` : `${p.sets} Sätze`],
+      }),
+      onePoint(metric.points.length),
+      valueTable(['Datum', metric.header, 'Sätze × Wdh.'],
+        [...metric.points].reverse().map((p) => [longDate(p.date), formatNumber(p.value), `${p.sets} × ${formatNumber(p.reps)}`])),
     ] : empty('Noch keine Übung mit Gewicht eingetragen.'),
   );
 
@@ -590,6 +604,7 @@ function renderCharts() {
     bw.length ? [
       h('div', { class: 'muted chart-sub' }, 'in kg'),
       lineChart(bw),
+      onePoint(bw.length),
       valueTable(['Datum', 'kg'], [...bw].reverse().map((p) => [longDate(p.date), formatNumber(p.value)])),
     ] : empty('Noch keine Messung – eintragen im Tab Daten.'),
   );

@@ -49,9 +49,10 @@ function showTip(wrap, tip, svgX, svgY, lines) {
 }
 
 // Liniendiagramm. points: [{ date, value, ... }]; unit: "kg"; tipLines(p) → zusätzliche Tooltip-Zeilen
-export function lineChart(points, { unit = 'kg', color = 'var(--series-1)', tipLines = () => [] } = {}) {
+export function lineChart(points, { unit = 'kg', color = 'var(--series-1)', tipLines = () => [], integer = false } = {}) {
   const values = points.map((p) => p.value);
-  const ticks = niceTicks(Math.min(...values), Math.max(...values));
+  // integer: nur ganze Zahlen auf der Achse (z. B. Wiederholungen – keine "8,5 Wdh.")
+  const ticks = niceTicks(Math.min(...values), Math.max(...values)).filter((t) => !integer || Number.isInteger(t));
   const yMin = ticks[0];
   const yMax = ticks.at(-1);
   const d0 = dayNumber(points[0].date);

@@ -39,7 +39,10 @@ export function lastEntryFor(entries, exerciseId) {
 }
 
 // Vorbelegung fürs Formular: Werte vom letzten Mal, sonst Planwerte der Einheit.
+// Reihenfolge: 1. per "Ändern" gespeicherte Werte (bleiben dauerhaft), 2. letztes Training, 3. Plan
 export function defaultsFor(sessionId, exerciseId, entries) {
+  const target = entries.find((e) => e.type === 'target' && e.exercise === exerciseId);
+  if (target) return { sets: target.sets, reps: target.reps, weight: target.weight };
   const last = lastEntryFor(entries, exerciseId);
   if (last) return { sets: last.sets, reps: last.reps, weight: last.weight };
   const item = SESSIONS[sessionId].items.find((i) => i.ex === exerciseId);
@@ -90,6 +93,7 @@ export function formatEntry(entry) {
 export function entryDocId(entry) {
   if (entry.type === 'gym') return `gym_${entry.date}_${entry.exercise}`;
   if (entry.type === 'exercise') return `exercise_${entry.key}`; // selbst angelegte Übung
+  if (entry.type === 'target') return `target_${entry.exercise}`; // per "Ändern" gespeicherte Werte
   return `${entry.type}_${entry.date}`;
 }
 

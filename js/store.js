@@ -149,3 +149,8 @@ export function deleteGymEntries(date, exercises) {
 export function saveCustomExercise(exercise) {
   write({ ...exercise, type: 'exercise' });
 }
+
+// Per "Ändern" gespeicherte Werte einer Übung – gelten dauerhaft als neue Vorbelegung
+export function saveTarget(exercise, values) {
+  write({ type: 'target', exercise, sets: values.sets, reps: values.reps, weight: values.weight });
+}
