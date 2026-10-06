@@ -12,11 +12,12 @@ test('jede Übung in den Einheiten existiert im Katalog', () => {
   }
 });
 
-test('Anzahl Übungen wie in Gym.md: 32 Einträge, 31 verschiedene (Dips doppelt)', () => {
+test('Anzahl Übungen: Gym.md ohne die 2 Sprints = 30 Einträge, 29 verschiedene (Dips doppelt)', () => {
   const all = Object.values(SESSIONS).flatMap((s) => s.items.map((i) => i.ex));
-  assert.equal(all.length, 32);
-  assert.equal(new Set(all).size, 31);
-  assert.equal(Object.keys(EXERCISES).length, 31);
+  assert.equal(all.length, 30);
+  assert.equal(new Set(all).size, 29);
+  assert.ok(!all.includes('sprint_20') && !all.includes('sprint_30'), 'Sprints gestrichen');
+  assert.equal(Object.keys(EXERCISES).length, 31, 'Katalog behält die Sprints für alte Einträge');
 });
 
 function daysWith(type, predicate) {

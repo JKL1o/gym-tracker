@@ -18,14 +18,14 @@ const gym = (date, exercise, session) => ({ type: 'gym', date, exercise, session
 
 test('Gym: alles, teilweise, ausgefallen, offen', () => {
   const entries = [
-    ...['klimmzuege', 'schraegbank_kh', 'lh_rudern', 'dips', 'schulterdruecken_kh', 'face_pull', 'sprint_20']
+    ...['klimmzuege', 'schraegbank_kh', 'lh_rudern', 'dips', 'schulterdruecken_kh', 'face_pull']
       .map((ex) => gym('2026-10-05', ex, 'oka')),
     gym('2026-10-07', 'dips', 'arme'),
   ];
   const today = '2026-10-09'; // Freitag
-  assert.equal(dayStatus(week[0], entries, today).gym.status, 'done');     // Mo 7/7
+  assert.equal(dayStatus(week[0], entries, today).gym.status, 'done');     // Mo 6/6
   const mi = dayStatus(week[2], entries, today).gym;
-  assert.deepEqual([mi.status, mi.done, mi.total], ['partial', 1, 11]);     // Mi 1/11
+  assert.deepEqual([mi.status, mi.done, mi.total], ['partial', 1, 10]);     // Mi 1/10 (ohne Sprint)
   assert.equal(dayStatus(week[3], entries, today).gym.status, 'missed');   // Do nichts, vorbei
   assert.equal(dayStatus(week[5], entries, today).gym.status, 'open');     // Sa kommt noch
   assert.equal(dayStatus(week[1], entries, today).gym, null);              // Di frei

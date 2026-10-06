@@ -6,7 +6,7 @@ import {
 } from './entries.js';
 import {
   loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry,
-  saveGymEntries, deleteGymEntries, saveCustomExercise, saveTarget,
+  saveCustomExercise, saveTarget,
   initStore, onChange, onError, status, signIn, signOut,
 } from './store.js';
 import { toCSV } from './export.js';
@@ -207,33 +207,6 @@ function exerciseRow(sessionId, item, entries) {
     ),
   );
   return row;
-}
-
-// Schalter "Alles erledigt": hakt alle offenen Übungen mit den angezeigten Werten ab.
-// Ausschalten entfernt alle Haken dieser Einheit an diesem Tag (mit Rückfrage).
-function allDoneRow(sessionId, session, entries, doneCount) {
-  const all = doneCount === session.items.length;
-  function toggle() {
-    const isDone = (ex) => entries.some((e) => e.type === 'gym' && e.exercise === ex && e.date === state.date);
-    if (all) {
-      if (!confirm(`Alle ${session.items.length} Haken entfernen?`)) return;
-      deleteGymEntries(state.date, session.items.map((i) => i.ex));
-    } else {
-      saveGymEntries(session.items.filter((i) => !isDone(i.ex)).map((i) => {
-        const v = defaultsFor(sessionId, i.ex, entries);
-        return { type: 'gym', date: state.date, session: sessionId, exercise: i.ex, sets: v.sets, reps: v.reps, weight: v.weight };
-      }));
-    }
-    state.editing = null;
-    render();
-  }
-  return h('div', { class: 'all-done' },
-    h('span', {}, 'Alles erledigt'),
-    h('button', {
-      class: `switch${all ? ' on' : ''}`, role: 'switch', 'aria-checked': all ? 'true' : 'false',
-      'aria-label': 'Alles erledigt', onclick: toggle,
-    }),
-  );
 }
 
 // Formular: neue Übung dauerhaft zur Einheit hinzufügen
@@ -460,7 +433,6 @@ function renderTraining() {
       ),
       session.note ? h('div', { class: 'note' }, session.note) : null,
       h('div', { class: 'card list' },
-        allDoneRow(sessionId, session, entries, doneCount),
         session.items.map((item) => exerciseRow(sessionId, item, entries)),
       ),
       state.adding

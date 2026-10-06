@@ -44,6 +44,8 @@ export const EXERCISES = {
 
 // Einheiten mit Planwerten. Texte (kg, Sätze, Wdh., Pause) 1:1 aus Gym.md;
 // estimate = im Plan mit * markiert ("Schätzwert – beim ersten Mal messen").
+// Abweichung von Gym.md: Sprints (20 m, 30 m fliegend) laut Jalil gestrichen – im Katalog oben bleiben
+// sie nur, damit eventuelle alte Einträge ihren Namen behalten.
 // Abweichung von Gym.md: Hammer Curls, Curls im Sitzen, Seitheben, Bulgarian Split Squat
 // sind laut Jalil pro Hand gemeint und daher als "2 × … kg" geführt.
 export const SESSIONS = {
@@ -56,7 +58,6 @@ export const SESSIONS = {
       { ex: 'dips',                kg: 'KG',         sets: '3', reps: '8–12',  pause: '90 s' },
       { ex: 'schulterdruecken_kh', kg: '2 × 12 kg',  sets: '3', reps: '8–10',  pause: '2 min', estimate: true },
       { ex: 'face_pull',           kg: '15 kg',      sets: '3', reps: '10–15', pause: '60 s',  estimate: true },
-      { ex: 'sprint_20',           kg: '—',          sets: '4', reps: '1',     pause: '3 min' },
     ],
   },
   arme: {
@@ -72,7 +73,6 @@ export const SESSIONS = {
       { ex: 'pallof_press',        kg: '10 kg',      sets: '3', reps: '12 / Seite',  pause: '60 s', estimate: true },
       { ex: 'side_plank',          kg: 'KG',         sets: '3', reps: '10 / Seite',  pause: '45 s' },
       { ex: 'copenhagen_plank',    kg: 'KG',         sets: '3', reps: '30 s / Seite', pause: '45 s' },
-      { ex: 'sprint_30',           kg: '—',          sets: '3', reps: '1',           pause: '4 min' },
     ],
   },
   okb: {
