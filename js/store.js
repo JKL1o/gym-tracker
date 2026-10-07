@@ -140,3 +140,12 @@ export function hideExercise(session, exercise) {
 export function unhideExercise(session, exercise) {
   remove(entryDocId({ type: 'hidden', session, exercise }));
 }
+
+// Übung nur an einem Tag weglassen bzw. wieder zurückholen
+export function skipExercise(date, session, exercise) {
+  write({ type: 'skip', date, session, exercise });
+}
+
+export function unskipExercise(date, session, exercise) {
+  remove(entryDocId({ type: 'skip', date, session, exercise }));
+}

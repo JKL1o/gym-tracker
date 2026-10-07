@@ -1,12 +1,12 @@
 // Oberfläche: Training eintragen, Wochenplan, Daten-Export.
 import { EXERCISES, SESSIONS, plannedWeek, mondayOf, toISODate, applyCustomExercises } from './plan.js';
 import {
-  defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay,
+  defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay, skippedOn,
   validateFootball, validateBodyweight, bodyweightHistory, bodyweightChange,
 } from './entries.js';
 import {
   loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry,
-  saveCustomExercise, saveTarget, hideExercise, unhideExercise,
+  saveCustomExercise, saveTarget, hideExercise, unhideExercise, skipExercise, unskipExercise,
   initStore, onChange, onError, status, signIn, signOut,
 } from './store.js';
 import { toCSV } from './export.js';
@@ -195,21 +195,33 @@ function exerciseRow(sessionId, item, entries) {
         }, 'Speichern'),
       ),
       // Nur selbst angelegte Übungen lassen sich aus dem Plan entfernen (die aus Gym.md nicht)
-      // Jede Übung lässt sich aus der Einheit entfernen (wiederherstellbar unter "Entfernte Übungen")
-      h('button', {
-        class: 'btn-text danger center',
-        onclick: () => {
-          if (!confirm(`"${ex.name}" aus ${SESSIONS[sessionId].name} entfernen? Bisherige Einträge bleiben erhalten, wiederherstellen geht jederzeit.`)) return;
-          if (item.custom) {
-            const def = entries.find((e) => e.type === 'exercise' && e.key === item.ex);
-            if (def) saveCustomExercise({ ...def, archived: true });
-          } else {
-            hideExercise(sessionId, item.ex);
-          }
-          state.editing = null;
-          render();
-        },
-      }, 'Aus Plan entfernen'),
+      // Weglassen: nur heute (nächstes Mal wieder da) oder dauerhaft aus der Einheit.
+      // Beides lässt sich unter "Weggelassen / entfernt" wieder zurückholen.
+      h('div', { class: 'remove-actions' },
+        h('button', {
+          class: 'btn-secondary',
+          onclick: () => {
+            if (done) deleteGymEntry(state.date, item.ex); // weggelassen = nicht gemacht
+            skipExercise(state.date, sessionId, item.ex);
+            state.editing = null;
+            render();
+          },
+        }, 'Nur heute weglassen'),
+        h('button', {
+          class: 'btn-secondary danger',
+          onclick: () => {
+            if (!confirm(`"${ex.name}" dauerhaft aus ${SESSIONS[sessionId].name} entfernen? Bisherige Einträge bleiben erhalten, wiederherstellen geht jederzeit.`)) return;
+            if (item.custom) {
+              const def = entries.find((e) => e.type === 'exercise' && e.key === item.ex);
+              if (def) saveCustomExercise({ ...def, archived: true });
+            } else {
+              hideExercise(sessionId, item.ex);
+            }
+            state.editing = null;
+            render();
+          },
+        }, 'Dauerhaft entfernen'),
+      ),
     ),
   );
   return row;
@@ -217,19 +229,21 @@ function exerciseRow(sessionId, item, entries) {
 
 // Aus dieser Einheit entfernte Übungen (Gym.md-Übungen und eigene) zum Wiederherstellen
 function removedExercises(sessionId, entries) {
+  const today = entries.filter((e) => e.type === 'skip' && e.date === state.date && e.session === sessionId)
+    .map((e) => ({ name: EXERCISES[e.exercise]?.name ?? e.exercise, kind: 'nur heute', restore: () => unskipExercise(state.date, sessionId, e.exercise) }));
   const builtIn = entries.filter((e) => e.type === 'hidden' && e.session === sessionId)
-    .map((e) => ({ name: EXERCISES[e.exercise]?.name ?? e.exercise, restore: () => unhideExercise(sessionId, e.exercise) }));
+    .map((e) => ({ name: EXERCISES[e.exercise]?.name ?? e.exercise, kind: 'dauerhaft', restore: () => unhideExercise(sessionId, e.exercise) }));
   const own = entries.filter((e) => e.type === 'exercise' && e.session === sessionId && e.archived)
-    .map((e) => ({ name: e.name, restore: () => saveCustomExercise({ ...e, archived: false }) }));
-  return [...builtIn, ...own];
+    .map((e) => ({ name: e.name, kind: 'dauerhaft', restore: () => saveCustomExercise({ ...e, archived: false }) }));
+  return [...today, ...builtIn, ...own];
 }
 
 function removedCard(removed) {
   return h('div', { class: 'card' },
-    h('div', { class: 'card-title' }, 'Entfernte Übungen'),
+    h('div', { class: 'card-title' }, 'Weggelassen / entfernt'),
     h('div', { class: 'history' }, removed.map((r) => h('div', { class: 'history-row' },
-      h('span', {}, r.name),
-      h('button', { class: 'btn-text', onclick: () => { r.restore(); render(); } }, 'Wiederherstellen'),
+      h('span', {}, r.name, h('span', { class: 'muted small' }, ` · ${r.kind}`)),
+      h('button', { class: 'btn-text', onclick: () => { r.restore(); render(); } }, 'Zurückholen'),
     ))),
   );
 }
@@ -450,16 +464,18 @@ function renderTraining() {
   } else {
     const session = SESSIONS[sessionId];
     const removed = removedExercises(sessionId, entries);
-    const doneCount = session.items.filter((item) =>
+    const skipped = skippedOn(entries, state.date, sessionId);
+    const items = session.items.filter((item) => !skipped.has(item.ex)); // ohne "nur heute weggelassene"
+    const doneCount = items.filter((item) =>
       entries.some((e) => e.type === 'gym' && e.exercise === item.ex && e.date === state.date)).length;
     parts.push(
       h('div', { class: 'progress-line' },
-        h('div', { class: 'progress' }, h('div', { class: 'progress-bar', style: `width:${(doneCount / session.items.length) * 100}%` })),
-        h('span', { class: 'muted' }, `${doneCount} / ${session.items.length}`),
+        h('div', { class: 'progress' }, h('div', { class: 'progress-bar', style: `width:${items.length ? (doneCount / items.length) * 100 : 0}%` })),
+        h('span', { class: 'muted' }, `${doneCount} / ${items.length}`),
       ),
       session.note ? h('div', { class: 'note' }, session.note) : null,
       h('div', { class: 'card list' },
-        session.items.map((item) => exerciseRow(sessionId, item, entries)),
+        items.map((item) => exerciseRow(sessionId, item, entries)),
       ),
       state.adding
         ? addExerciseCard(sessionId)
@@ -469,7 +485,7 @@ function renderTraining() {
         ),
       removed.length && !state.adding
         ? h('button', { class: 'btn-text center', onclick: () => { state.showRemoved = !state.showRemoved; render(); } },
-          state.showRemoved ? 'Entfernte Übungen ausblenden' : `Entfernte Übungen (${removed.length})`)
+          state.showRemoved ? 'Weggelassene ausblenden' : `Weggelassen / entfernt (${removed.length})`)
         : null,
       removed.length && state.showRemoved && !state.adding ? removedCard(removed) : null,
     );
@@ -489,6 +505,7 @@ function gymBadge(g) {
   if (g.status === 'done') return badge('done', `${g.done}/${g.total}`);
   if (g.status === 'partial') return badge('partial', `${g.done}/${g.total}`);
   if (g.status === 'missed') return badge('missed', 'ausgefallen');
+  if (g.status === 'skipped') return badge('extra', 'weggelassen');
   return null;
 }
 

@@ -1,6 +1,7 @@
 // Wochenübersicht: was war geplant, was wurde gemacht, was ist ausgefallen.
 // Reine Logik ohne Browser – automatisch testbar.
 import { SESSIONS } from './plan.js';
+import { skippedOn } from './entries.js';
 
 // Kalenderwoche nach ISO 8601 (wie in Österreich üblich): Woche 1 enthält den ersten Donnerstag.
 export function isoWeek(date) {
@@ -21,10 +22,13 @@ export function dayStatus(day, entries, today) {
   const session = gymEntries[0]?.session ?? day.gym;
   let gym = null;
   if (session) {
-    const total = SESSIONS[session]?.items.length ?? gymEntries.length;
+    // "Nur heute weggelassene" Übungen zählen an diesem Tag nicht mit
+    const skipped = skippedOn(entries, day.date, session);
+    const total = SESSIONS[session] ? SESSIONS[session].items.filter((i) => !skipped.has(i.ex)).length : gymEntries.length;
     const done = gymEntries.length;
     let status;
     if (done > 0) status = done >= total ? 'done' : 'partial';
+    else if (total === 0) status = 'skipped'; // alles weggelassen
     else status = day.date < today ? 'missed' : 'open';
     gym = { session, planned: session === day.gym, done, total, status };
   }

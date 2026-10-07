@@ -95,6 +95,7 @@ export function entryDocId(entry) {
   if (entry.type === 'exercise') return `exercise_${entry.key}`; // selbst angelegte Übung
   if (entry.type === 'target') return `target_${entry.exercise}`; // per "Ändern" gespeicherte Werte
   if (entry.type === 'hidden') return `hidden_${entry.session}_${entry.exercise}`; // aus Plan entfernt
+  if (entry.type === 'skip') return `skip_${entry.date}_${entry.session}_${entry.exercise}`; // nur an dem Tag weggelassen
   return `${entry.type}_${entry.date}`;
 }
 
@@ -143,4 +144,9 @@ export function bodyweightChange(entries) {
   const [latest, previous] = bodyweightHistory(entries);
   if (!latest || !previous) return null;
   return Math.round((latest.kg - previous.kg) * 10) / 10;
+}
+
+// Übungen, die an einem Tag in einer Einheit "nur heute weggelassen" wurden
+export function skippedOn(entries, date, session) {
+  return new Set(entries.filter((e) => e.type === 'skip' && e.date === date && e.session === session).map((e) => e.exercise));
 }

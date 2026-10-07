@@ -70,3 +70,17 @@ test('Einträge vom Typ "exercise" (eigene Übungen) zählen nicht als Training'
   const s = dayStatus(week[1], [{ type: 'exercise', key: 'c_x', session: 'uk' }], '2026-10-09');
   assert.deepEqual(s, { gym: null, football: null });
 });
+
+test('"Nur heute weglassen": Übung zählt an dem Tag nicht, an anderen Tagen schon', async () => {
+  const { entryDocId } = await import('../js/entries.js');
+  const skip = { type: 'skip', date: '2026-10-05', session: 'oka', exercise: 'face_pull' };
+  const five = ['klimmzuege', 'schraegbank_kh', 'lh_rudern', 'dips', 'schulterdruecken_kh'].map((ex) => gym('2026-10-05', ex, 'oka'));
+  const mo = dayStatus(week[0], [...five, skip], '2026-10-09').gym;
+  assert.deepEqual([mo.status, mo.done, mo.total], ['done', 5, 5], '5 von 5 = erledigt, Face Pull weggelassen');
+  const ohneSkip = dayStatus(week[0], five, '2026-10-09').gym;
+  assert.equal(ohneSkip.status, 'partial', 'ohne Weglassen wären es 5 von 6');
+  const allSkipped = ['klimmzuege', 'schraegbank_kh', 'lh_rudern', 'dips', 'schulterdruecken_kh', 'face_pull']
+    .map((exercise) => ({ type: 'skip', date: '2026-10-08', session: 'oka', exercise }));
+  assert.equal(dayStatus({ ...week[3], gym: 'oka' }, allSkipped, '2026-10-09').gym.status, 'skipped');
+  assert.equal(entryDocId(skip), 'skip_2026-10-05_oka_face_pull');
+});
