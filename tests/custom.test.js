@@ -67,3 +67,17 @@ test('Schlüssel und Speicher-ID eigener Übungen', () => {
   assert.notEqual(newExerciseKey(1, 0.1), newExerciseKey(1, 0.9));
   assert.equal(entryDocId({ type: 'exercise', key: 'c_abc' }), 'exercise_c_abc');
 });
+
+test('Auch Gym.md-Übungen lassen sich aus einer Einheit entfernen und wiederherstellen', () => {
+  const before = SESSIONS.oka.items.map((i) => i.ex);
+  applyCustomExercises([], [{ session: 'oka', exercise: 'face_pull' }]);
+  assert.ok(!SESSIONS.oka.items.some((i) => i.ex === 'face_pull'), 'Face Pull weg');
+  assert.equal(SESSIONS.oka.items.length, before.length - 1);
+  assert.ok(SESSIONS.arme.items.some((i) => i.ex === 'dips'), 'andere Einheiten unberührt');
+  assert.equal(EXERCISES.face_pull.name, 'Face Pull', 'Name bleibt für alte Einträge');
+  applyCustomExercises([], [{ session: 'oka', exercise: 'dips' }]);
+  assert.ok(SESSIONS.arme.items.some((i) => i.ex === 'dips'), 'Dips nur in Oberkörper A entfernt, in Arme + Core noch da');
+  applyCustomExercises([], []);
+  assert.deepEqual(SESSIONS.oka.items.map((i) => i.ex), before, 'wiederhergestellt');
+  assert.equal(entryDocId({ type: 'hidden', session: 'oka', exercise: 'face_pull' }), 'hidden_oka_face_pull');
+});

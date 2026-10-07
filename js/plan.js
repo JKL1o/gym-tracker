@@ -180,7 +180,8 @@ export function planWeightText(load, weight) {
 
 // customs: Liste der gespeicherten eigenen Übungen. Entfernte (archived) bleiben im Katalog,
 // damit alte Einträge weiter ihren Namen haben, erscheinen aber in keiner Einheit mehr.
-export function applyCustomExercises(customs) {
+// hidden: Liste { session, exercise } – aus dem Plan entfernte Übungen (auch solche aus Gym.md)
+export function applyCustomExercises(customs, hidden = []) {
   for (const id of Object.keys(EXERCISES)) if (!BASE_EXERCISE_IDS.has(id)) delete EXERCISES[id];
   for (const [id, items] of Object.entries(BASE_ITEMS)) SESSIONS[id].items = [...items];
   const sorted = [...customs].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
@@ -190,5 +191,8 @@ export function applyCustomExercises(customs) {
     SESSIONS[c.session].items.push({
       ex: c.key, kg: planWeightText(c.load, c.weight), sets: String(c.sets), reps: String(c.reps), pause: '', custom: true,
     });
+  }
+  for (const hd of hidden) {
+    if (SESSIONS[hd.session]) SESSIONS[hd.session].items = SESSIONS[hd.session].items.filter((i) => i.ex !== hd.exercise);
   }
 }

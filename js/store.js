@@ -131,3 +131,12 @@ export function saveCustomExercise(exercise) {
 export function saveTarget(exercise, values) {
   write({ type: 'target', exercise, sets: values.sets, reps: values.reps, weight: values.weight });
 }
+
+// Übung aus einer Einheit entfernen bzw. wiederherstellen (gilt für Übungen aus Gym.md)
+export function hideExercise(session, exercise) {
+  write({ type: 'hidden', session, exercise });
+}
+
+export function unhideExercise(session, exercise) {
+  remove(entryDocId({ type: 'hidden', session, exercise }));
+}

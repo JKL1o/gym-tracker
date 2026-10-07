@@ -94,6 +94,7 @@ export function entryDocId(entry) {
   if (entry.type === 'gym') return `gym_${entry.date}_${entry.exercise}`;
   if (entry.type === 'exercise') return `exercise_${entry.key}`; // selbst angelegte Übung
   if (entry.type === 'target') return `target_${entry.exercise}`; // per "Ändern" gespeicherte Werte
+  if (entry.type === 'hidden') return `hidden_${entry.session}_${entry.exercise}`; // aus Plan entfernt
   return `${entry.type}_${entry.date}`;
 }
 

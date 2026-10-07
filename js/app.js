@@ -6,7 +6,7 @@ import {
 } from './entries.js';
 import {
   loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry,
-  saveCustomExercise, saveTarget,
+  saveCustomExercise, saveTarget, hideExercise, unhideExercise,
   initStore, onChange, onError, status, signIn, signOut,
 } from './store.js';
 import { toCSV } from './export.js';
@@ -31,6 +31,7 @@ const state = {
   footballOther: null, // Datum, an dem auch die nicht geplante Fußball-Art angezeigt wird
   adding: false,       // Formular "Übung hinzufügen" offen
   chartExercise: null, // im Verlauf ausgewählte Übung
+  showRemoved: false,  // Liste "Entfernte Übungen" offen
 };
 
 const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -194,19 +195,43 @@ function exerciseRow(sessionId, item, entries) {
         }, 'Speichern'),
       ),
       // Nur selbst angelegte Übungen lassen sich aus dem Plan entfernen (die aus Gym.md nicht)
-      item.custom ? h('button', {
+      // Jede Übung lässt sich aus der Einheit entfernen (wiederherstellbar unter "Entfernte Übungen")
+      h('button', {
         class: 'btn-text danger center',
         onclick: () => {
-          if (!confirm(`"${ex.name}" aus dem Plan entfernen? Bisherige Einträge bleiben erhalten.`)) return;
-          const def = entries.find((e) => e.type === 'exercise' && e.key === item.ex);
-          if (def) saveCustomExercise({ ...def, archived: true });
+          if (!confirm(`"${ex.name}" aus ${SESSIONS[sessionId].name} entfernen? Bisherige Einträge bleiben erhalten, wiederherstellen geht jederzeit.`)) return;
+          if (item.custom) {
+            const def = entries.find((e) => e.type === 'exercise' && e.key === item.ex);
+            if (def) saveCustomExercise({ ...def, archived: true });
+          } else {
+            hideExercise(sessionId, item.ex);
+          }
           state.editing = null;
           render();
         },
-      }, 'Aus Plan entfernen') : null,
+      }, 'Aus Plan entfernen'),
     ),
   );
   return row;
+}
+
+// Aus dieser Einheit entfernte Übungen (Gym.md-Übungen und eigene) zum Wiederherstellen
+function removedExercises(sessionId, entries) {
+  const builtIn = entries.filter((e) => e.type === 'hidden' && e.session === sessionId)
+    .map((e) => ({ name: EXERCISES[e.exercise]?.name ?? e.exercise, restore: () => unhideExercise(sessionId, e.exercise) }));
+  const own = entries.filter((e) => e.type === 'exercise' && e.session === sessionId && e.archived)
+    .map((e) => ({ name: e.name, restore: () => saveCustomExercise({ ...e, archived: false }) }));
+  return [...builtIn, ...own];
+}
+
+function removedCard(removed) {
+  return h('div', { class: 'card' },
+    h('div', { class: 'card-title' }, 'Entfernte Übungen'),
+    h('div', { class: 'history' }, removed.map((r) => h('div', { class: 'history-row' },
+      h('span', {}, r.name),
+      h('button', { class: 'btn-text', onclick: () => { r.restore(); render(); } }, 'Wiederherstellen'),
+    ))),
+  );
 }
 
 // Formular: neue Übung dauerhaft zur Einheit hinzufügen
@@ -424,6 +449,7 @@ function renderTraining() {
     ));
   } else {
     const session = SESSIONS[sessionId];
+    const removed = removedExercises(sessionId, entries);
     const doneCount = session.items.filter((item) =>
       entries.some((e) => e.type === 'gym' && e.exercise === item.ex && e.date === state.date)).length;
     parts.push(
@@ -441,6 +467,11 @@ function renderTraining() {
           h('button', { class: 'btn-text', onclick: () => { state.adding = true; state.editing = null; render(); } }, '+ Übung hinzufügen'),
           h('button', { class: 'btn-text', onclick: () => { state.choosing = true; render(); } }, 'Andere Einheit wählen'),
         ),
+      removed.length && !state.adding
+        ? h('button', { class: 'btn-text center', onclick: () => { state.showRemoved = !state.showRemoved; render(); } },
+          state.showRemoved ? 'Entfernte Übungen ausblenden' : `Entfernte Übungen (${removed.length})`)
+        : null,
+      removed.length && state.showRemoved && !state.adding ? removedCard(removed) : null,
     );
   }
   parts.push(h('div', { class: 'gap' }), footballCard(day, entries));
@@ -712,7 +743,10 @@ function renderContent() {
       h('button', { class: 'btn-primary', onclick: () => signIn() }, 'Mit Google anmelden'));
   }
   // Selbst angelegte Übungen in den Plan einhängen, bevor irgendetwas angezeigt wird
-  applyCustomExercises(loadEntries().filter((e) => e.type === 'exercise'));
+  applyCustomExercises(
+    loadEntries().filter((e) => e.type === 'exercise'),
+    loadEntries().filter((e) => e.type === 'hidden'),
+  );
   return state.tab === 'woche' ? renderWeek()
     : state.tab === 'verlauf' ? renderCharts()
     : state.tab === 'daten' ? renderData()
