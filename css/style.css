@@ -389,3 +389,6 @@ nav#tabs[hidden] { display: none; }
 .remove-actions { display: flex; gap: 8px; margin-top: 10px; }
 .remove-actions button { flex: 1; padding: 9px 8px; font-size: 0.9rem; }
 .btn-secondary.danger { color: var(--error); }
+
+.move-actions { display: flex; gap: 8px; margin-top: 10px; }
+.move-actions button { flex: 1; padding: 9px 8px; font-size: 0.9rem; }

@@ -17,7 +17,7 @@ test('Anzahl Übungen: Gym.md ohne die 2 Sprints = 30 Einträge, 29 verschiedene
   assert.equal(all.length, 30);
   assert.equal(new Set(all).size, 29);
   assert.ok(!all.includes('sprint_20') && !all.includes('sprint_30'), 'Sprints gestrichen');
-  assert.equal(Object.keys(EXERCISES).length, 31, 'Katalog behält die Sprints für alte Einträge');
+  assert.equal(Object.keys(EXERCISES).length, 32, 'Katalog behält Sprints/Langhantelrudern für alte Einträge, + Lat Pulldown');
 });
 
 function daysWith(type, predicate) {
@@ -56,4 +56,12 @@ test('plannedWeek: 7 aufeinanderfolgende Tage, auch über die Zeitumstellung (25
 
 test('plannedWeek: unbekannter Wochentyp wirft Fehler', () => {
   assert.throws(() => plannedWeek('urlaub', new Date(2026, 9, 5)));
+});
+
+test('Planänderungen vom 11.10.: Lat Pulldown statt Langhantelrudern, Dips nach Klimmzügen, Back Extension am Donnerstag', () => {
+  assert.deepEqual(SESSIONS.oka.items.map((i) => i.ex).slice(0, 2), ['klimmzuege', 'dips']);
+  assert.ok(SESSIONS.oka.items.some((i) => i.ex === 'lat_pulldown'));
+  assert.ok(!SESSIONS.oka.items.some((i) => i.ex === 'lh_rudern'));
+  assert.ok(SESSIONS.okb.items.some((i) => i.ex === 'back_extension'));
+  assert.ok(!SESSIONS.uk.items.some((i) => i.ex === 'back_extension'));
 });

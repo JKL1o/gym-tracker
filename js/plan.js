@@ -29,6 +29,7 @@ export const EXERCISES = {
   tbar_rudern:          { name: 'T-Bar Rudern',                  load: 'kg',   unit: 'Wdh' },
   brustpresse:          { name: 'Brustpresse',                   load: 'kg',   unit: 'Wdh' },
   lat_pulldown_eng:     { name: 'Lat Pulldown, enger Griff',     load: 'kg',   unit: 'Wdh' },
+  lat_pulldown:         { name: 'Lat Pulldown',                  load: 'kg',   unit: 'Wdh' },
   schraegbank_maschine: { name: 'Schrägbankdrücken Maschine',    load: 'kg',   unit: 'Wdh' },
   seitheben:            { name: 'Seitheben',                     load: 'kg2',  unit: 'Wdh' },
   reverse_butterfly:    { name: 'Reverse Butterfly',             load: 'kg',   unit: 'Wdh' },
@@ -46,6 +47,9 @@ export const EXERCISES = {
 // estimate = im Plan mit * markiert ("Schätzwert – beim ersten Mal messen").
 // Abweichung von Gym.md: Sprints (20 m, 30 m fliegend) laut Jalil gestrichen – im Katalog oben bleiben
 // sie nur, damit eventuelle alte Einträge ihren Namen behalten.
+// Abweichung von Gym.md (laut Jalil, 11.10.2026): Montag Lat Pulldown statt Langhantelrudern (Startwert
+// 70 kg wie Lat Pulldown eng – per "Ändern" anpassen), Dips direkt nach Klimmzügen,
+// Back Extension von Samstag auf Donnerstag.
 // Abweichung von Gym.md: Hammer Curls, Curls im Sitzen, Seitheben, Bulgarian Split Squat
 // sind laut Jalil pro Hand gemeint und daher als "2 × … kg" geführt.
 export const SESSIONS = {
@@ -53,9 +57,9 @@ export const SESSIONS = {
     name: 'Oberkörper A',
     items: [
       { ex: 'klimmzuege',          kg: '+2,5 kg',    sets: '4', reps: '5–8',   pause: '2–3 min' },
-      { ex: 'schraegbank_kh',      kg: '2 × 14 kg',  sets: '4', reps: '8–10',  pause: '2 min', estimate: true },
-      { ex: 'lh_rudern',           kg: '40 kg',      sets: '4', reps: '8–10',  pause: '2 min', estimate: true },
       { ex: 'dips',                kg: 'KG',         sets: '3', reps: '8–12',  pause: '90 s' },
+      { ex: 'schraegbank_kh',      kg: '2 × 14 kg',  sets: '4', reps: '8–10',  pause: '2 min', estimate: true },
+      { ex: 'lat_pulldown',        kg: '70 kg',      sets: '4', reps: '8–10',  pause: '2 min' },
       { ex: 'schulterdruecken_kh', kg: '2 × 12 kg',  sets: '3', reps: '8–10',  pause: '2 min', estimate: true },
       { ex: 'face_pull',           kg: '15 kg',      sets: '3', reps: '10–15', pause: '60 s',  estimate: true },
     ],
@@ -84,6 +88,7 @@ export const SESSIONS = {
       { ex: 'schraegbank_maschine', kg: '50 kg',  sets: '3',     reps: '8–12',  pause: '90 s' },
       { ex: 'seitheben',            kg: '2 × 8 kg', sets: '3',     reps: '12–15', pause: '60 s' },
       { ex: 'reverse_butterfly',    kg: '54 kg',  sets: '3',     reps: '12–15', pause: '60 s' },
+      { ex: 'back_extension',       kg: '15 kg',  sets: '3',     reps: '12–15', pause: '90 s' },
     ],
   },
   uk: {
@@ -95,7 +100,6 @@ export const SESSIONS = {
       { ex: 'kniebeuge',            kg: '40 kg', sets: '4', reps: '6–8',        pause: '3 min' },
       { ex: 'bulgarian_split',      kg: '2 × 10 kg', sets: '3', reps: '8 / Bein',   pause: '90 s' },
       { ex: 'romanian_deadlift',    kg: '40 kg', sets: '3', reps: '8',          pause: '2 min' },
-      { ex: 'back_extension',       kg: '15 kg', sets: '3', reps: '12–15',      pause: '90 s' },
       { ex: 'nordic_curl',          kg: 'Band',  sets: '2', reps: '5',          pause: '2 min' },
       { ex: 'wadenheben_einbeinig', kg: 'KG',    sets: '3', reps: '10 / Bein',  pause: '90 s' },
     ],
@@ -181,7 +185,8 @@ export function planWeightText(load, weight) {
 // customs: Liste der gespeicherten eigenen Übungen. Entfernte (archived) bleiben im Katalog,
 // damit alte Einträge weiter ihren Namen haben, erscheinen aber in keiner Einheit mehr.
 // hidden: Liste { session, exercise } – aus dem Plan entfernte Übungen (auch solche aus Gym.md)
-export function applyCustomExercises(customs, hidden = []) {
+// orders: Liste { session, order: [Übungs-IDs] } – selbst festgelegte Reihenfolge pro Einheit
+export function applyCustomExercises(customs, hidden = [], orders = []) {
   for (const id of Object.keys(EXERCISES)) if (!BASE_EXERCISE_IDS.has(id)) delete EXERCISES[id];
   for (const [id, items] of Object.entries(BASE_ITEMS)) SESSIONS[id].items = [...items];
   const sorted = [...customs].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
@@ -195,4 +200,25 @@ export function applyCustomExercises(customs, hidden = []) {
   for (const hd of hidden) {
     if (SESSIONS[hd.session]) SESSIONS[hd.session].items = SESSIONS[hd.session].items.filter((i) => i.ex !== hd.exercise);
   }
+  for (const o of orders) {
+    if (!SESSIONS[o.session]) continue;
+    // Übungen in gespeicherter Reihenfolge; neue (nicht in der Liste) behalten ihren Platz am Ende
+    const pos = (ex) => { const i = o.order.indexOf(ex); return i === -1 ? Infinity : i; };
+    SESSIONS[o.session].items = SESSIONS[o.session].items
+      .map((item, i) => ({ item, i }))
+      .sort((a, b) => pos(a.item.ex) - pos(b.item.ex) || a.i - b.i)
+      .map((x) => x.item);
+  }
+}
+
+// Übung eine Position nach oben (dir = -1) oder unten (+1) schieben.
+// all: alle Übungs-IDs der Einheit; visible: die heute angezeigten (ohne "nur heute weggelassene").
+// Getauscht wird mit dem nächsten sichtbaren Nachbarn. Gibt die neue Reihenfolge zurück.
+export function moveInOrder(all, visible, id, dir) {
+  const v = visible.indexOf(id);
+  const neighbor = visible[v + dir];
+  if (v === -1 || neighbor === undefined) return all;
+  const rest = all.filter((x) => x !== id);
+  const at = rest.indexOf(neighbor) + (dir > 0 ? 1 : 0);
+  return [...rest.slice(0, at), id, ...rest.slice(at)];
 }

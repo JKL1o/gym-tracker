@@ -149,3 +149,8 @@ export function skipExercise(date, session, exercise) {
 export function unskipExercise(date, session, exercise) {
   remove(entryDocId({ type: 'skip', date, session, exercise }));
 }
+
+// Selbst festgelegte Reihenfolge der Übungen einer Einheit
+export function saveOrder(session, order) {
+  write({ type: 'order', session, order });
+}

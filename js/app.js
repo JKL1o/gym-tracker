@@ -1,12 +1,12 @@
 // Oberfläche: Training eintragen, Wochenplan, Daten-Export.
-import { EXERCISES, SESSIONS, plannedWeek, mondayOf, toISODate, applyCustomExercises } from './plan.js';
+import { EXERCISES, SESSIONS, plannedWeek, mondayOf, toISODate, applyCustomExercises, moveInOrder } from './plan.js';
 import {
   defaultsFor, parseNumber, validateGym, formatEntry, formatNumber, sessionForDay, skippedOn,
   validateFootball, validateBodyweight, bodyweightHistory, bodyweightChange,
 } from './entries.js';
 import {
   loadEntries, saveGymEntry, deleteGymEntry, saveDayEntry, deleteDayEntry,
-  saveCustomExercise, saveTarget, hideExercise, unhideExercise, skipExercise, unskipExercise,
+  saveCustomExercise, saveTarget, hideExercise, unhideExercise, skipExercise, unskipExercise, saveOrder,
   initStore, onChange, onError, status, signIn, signOut,
 } from './store.js';
 import { toCSV } from './export.js';
@@ -123,7 +123,7 @@ function numberField(label, value, mode) {
 }
 
 // Eine Übung: Kreis zum Abhaken, Werte für heute, Plan. "Ändern" klappt die Felder auf.
-function exerciseRow(sessionId, item, entries) {
+function exerciseRow(sessionId, item, entries, visibleIds = []) {
   const ex = EXERCISES[item.ex];
   const done = entries.find((e) => e.type === 'gym' && e.exercise === item.ex && e.date === state.date);
   const values = done ?? defaultsFor(sessionId, item.ex, entries); // heute erledigt, sonst letztes Mal / Plan
@@ -155,7 +155,7 @@ function exerciseRow(sessionId, item, entries) {
       h('div', { class: 'row-text' },
         h('div', { class: 'row-name' }, ex.name),
         h('div', { class: 'row-values' }, formatEntry({ exercise: item.ex, ...values })),
-        h('div', { class: 'row-plan' }, `Plan ${item.sets} × ${item.reps} · ${item.kg}`, ex.note ? ` · ${ex.note}` : ''),
+        ex.note ? h('div', { class: 'row-plan' }, ex.note) : null,
       ),
       editing ? null : h('button', { class: 'btn-text', onclick: () => { state.editing = item.ex; render(); } }, 'Ändern'),
     ),
@@ -195,6 +195,28 @@ function exerciseRow(sessionId, item, entries) {
         }, 'Speichern'),
       ),
       // Nur selbst angelegte Übungen lassen sich aus dem Plan entfernen (die aus Gym.md nicht)
+      // Reihenfolge ändern – wird gespeichert und gilt dauerhaft für diese Einheit
+      h('div', { class: 'move-actions' },
+        ['Nach oben', 'Nach unten'].map((label, k) => {
+          const dir = k === 0 ? -1 : 1;
+          const pos = visibleIds.indexOf(item.ex);
+          const possible = pos !== -1 && visibleIds[pos + dir] !== undefined;
+          return h('button', {
+            class: 'btn-secondary',
+            disabled: possible ? null : 'disabled',
+            onclick: () => {
+              const all = SESSIONS[sessionId].items.map((i) => i.ex);
+              const order = moveInOrder(all, visibleIds, item.ex, dir);
+              saveOrder(sessionId, order);
+              applyCustomExercises( // sofort anzeigen, ohne auf die Datenbank zu warten
+                entries.filter((e) => e.type === 'exercise'), entries.filter((e) => e.type === 'hidden'),
+                [{ session: sessionId, order }],
+              );
+              render();
+            },
+          }, label);
+        }),
+      ),
       // Weglassen: nur heute (nächstes Mal wieder da) oder dauerhaft aus der Einheit.
       // Beides lässt sich unter "Weggelassen / entfernt" wieder zurückholen.
       h('div', { class: 'remove-actions' },
@@ -475,7 +497,7 @@ function renderTraining() {
       ),
       session.note ? h('div', { class: 'note' }, session.note) : null,
       h('div', { class: 'card list' },
-        items.map((item) => exerciseRow(sessionId, item, entries)),
+        items.map((item) => exerciseRow(sessionId, item, entries, items.map((i) => i.ex))),
       ),
       state.adding
         ? addExerciseCard(sessionId)
@@ -562,7 +584,8 @@ function renderWeek() {
       open ? h('div', { class: 'plan-list' },
         session.items.map((item) => h('div', { class: 'plan-item' },
           h('span', {}, EXERCISES[item.ex].name),
-          h('span', { class: 'muted' }, `${item.sets} × ${item.reps} · ${item.kg}`),
+          // aktuelle Werte (per "Ändern" gespeichert, sonst letztes Training, sonst Plan)
+          h('span', { class: 'muted' }, formatEntry({ exercise: item.ex, ...defaultsFor(s.gym.session, item.ex, entries) })),
         )),
         session.note ? h('div', { class: 'note' }, session.note) : null,
       ) : null,
@@ -763,6 +786,7 @@ function renderContent() {
   applyCustomExercises(
     loadEntries().filter((e) => e.type === 'exercise'),
     loadEntries().filter((e) => e.type === 'hidden'),
+    loadEntries().filter((e) => e.type === 'order'),
   );
   return state.tab === 'woche' ? renderWeek()
     : state.tab === 'verlauf' ? renderCharts()

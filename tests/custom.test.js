@@ -81,3 +81,25 @@ test('Auch Gym.md-Übungen lassen sich aus einer Einheit entfernen und wiederher
   assert.deepEqual(SESSIONS.oka.items.map((i) => i.ex), before, 'wiederhergestellt');
   assert.equal(entryDocId({ type: 'hidden', session: 'oka', exercise: 'face_pull' }), 'hidden_oka_face_pull');
 });
+
+test('Reihenfolge verschieben und gespeicherte Reihenfolge anwenden', async () => {
+  const { moveInOrder } = await import('../js/plan.js');
+  const all = ['a', 'b', 'c', 'd'];
+  assert.deepEqual(moveInOrder(all, all, 'c', -1), ['a', 'c', 'b', 'd']);
+  assert.deepEqual(moveInOrder(all, all, 'b', 1), ['a', 'c', 'b', 'd']);
+  assert.deepEqual(moveInOrder(all, all, 'a', -1), all, 'ganz oben bleibt oben');
+  assert.deepEqual(moveInOrder(all, all, 'd', 1), all, 'ganz unten bleibt unten');
+  // b heute weggelassen (unsichtbar): c nach oben springt über b hinweg vor a
+  assert.deepEqual(moveInOrder(all, ['a', 'c', 'd'], 'c', -1), ['c', 'a', 'b', 'd']);
+
+  const before = SESSIONS.oka.items.map((i) => i.ex);
+  const reversed = [...before].reverse();
+  applyCustomExercises([], [], [{ session: 'oka', order: reversed }]);
+  assert.deepEqual(SESSIONS.oka.items.map((i) => i.ex), reversed);
+  // Übung, die in der gespeicherten Liste fehlt (z. B. später hinzugefügt), kommt ans Ende
+  applyCustomExercises([], [], [{ session: 'oka', order: reversed.slice(1) }]);
+  assert.equal(SESSIONS.oka.items.at(-1).ex, reversed[0]);
+  applyCustomExercises([], [], []);
+  assert.deepEqual(SESSIONS.oka.items.map((i) => i.ex), before);
+  assert.equal(entryDocId({ type: 'order', session: 'oka' }), 'order_oka');
+});

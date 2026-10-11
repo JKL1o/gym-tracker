@@ -95,6 +95,7 @@ export function entryDocId(entry) {
   if (entry.type === 'exercise') return `exercise_${entry.key}`; // selbst angelegte Übung
   if (entry.type === 'target') return `target_${entry.exercise}`; // per "Ändern" gespeicherte Werte
   if (entry.type === 'hidden') return `hidden_${entry.session}_${entry.exercise}`; // aus Plan entfernt
+  if (entry.type === 'order') return `order_${entry.session}`; // Reihenfolge einer Einheit
   if (entry.type === 'skip') return `skip_${entry.date}_${entry.session}_${entry.exercise}`; // nur an dem Tag weggelassen
   return `${entry.type}_${entry.date}`;
 }
