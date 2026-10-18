@@ -41,6 +41,7 @@ export function lastEntryFor(entries, exerciseId) {
 // Vorbelegung fürs Formular: Werte vom letzten Mal, sonst Planwerte der Einheit.
 // Reihenfolge: 1. per "Ändern" gespeicherte Werte (bleiben dauerhaft), 2. letztes Training, 3. Plan
 export function defaultsFor(sessionId, exerciseId, entries) {
+  if (EXERCISES[exerciseId]?.checkOnly) return { sets: null, reps: null, weight: null };
   const target = entries.find((e) => e.type === 'target' && e.exercise === exerciseId);
   if (target) return { sets: target.sets, reps: target.reps, weight: target.weight };
   const last = lastEntryFor(entries, exerciseId);
@@ -56,6 +57,7 @@ export function validateGym(entry) {
   const ex = EXERCISES[entry.exercise];
   if (!ex) return ['Unbekannte Übung'];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date ?? '')) errors.push('Datum fehlt');
+  if (ex.checkOnly) return errors; // nur abhaken, keine Werte
   if (!Number.isInteger(entry.sets) || entry.sets < 1 || entry.sets > 20) errors.push('Sätze: ganze Zahl von 1 bis 20');
   if (!(entry.reps > 0 && entry.reps <= 1000)) errors.push('Wiederholungen: Zahl größer 0');
   if (ex.load === 'none') {
@@ -70,7 +72,9 @@ export function validateGym(entry) {
 
 // Gewicht für die Anzeige, abhängig von der Übungsart.
 export function formatWeight(exerciseId, weight) {
-  switch (EXERCISES[exerciseId].load) {
+  const load = EXERCISES[exerciseId].load;
+  if (load !== 'none' && load !== 'bw' && (weight === null || weight === undefined)) return 'Gewicht eintragen';
+  switch (load) {
     case 'none': return '—';
     case 'bw': return weight > 0 ? `KG + ${formatNumber(weight)} kg` : 'KG';
     case 'kg2': return `2 × ${formatNumber(weight)} kg`;
@@ -83,6 +87,7 @@ const UNIT_LABEL = { Wdh: 'Wdh.', m: 'm', s: 's' };
 // Eintrag als kurzer Text. Beispiel: "4 × 10 Wdh. · 40 kg" oder "3 × 30 s / Seite · KG"
 export function formatEntry(entry) {
   const ex = EXERCISES[entry.exercise];
+  if (ex.checkOnly) return ''; // nur abhaken
   const side = ex.perSide ? ' / Seite' : '';
   return `${entry.sets} × ${formatNumber(entry.reps)} ${UNIT_LABEL[ex.unit]}${side} · ${formatWeight(entry.exercise, entry.weight)}`;
 }

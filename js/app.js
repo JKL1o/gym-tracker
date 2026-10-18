@@ -32,6 +32,7 @@ const state = {
   adding: false,       // Formular "Übung hinzufügen" offen
   chartExercise: null, // im Verlauf ausgewählte Übung
   showRemoved: false,  // Liste "Entfernte Übungen" offen
+  editHint: null,      // Hinweis im Bearbeiten-Feld (z. B. "erst Gewicht eintragen")
 };
 
 const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -140,8 +141,13 @@ function exerciseRow(sessionId, item, entries, visibleIds = []) {
   }
 
   function toggleDone() {
-    if (done) deleteGymEntry(state.date, item.ex);
-    else store({ sets: values.sets, reps: values.reps, weight: values.weight });
+    if (done) {
+      deleteGymEntry(state.date, item.ex);
+    } else if (store({ sets: values.sets, reps: values.reps, weight: values.weight }).length) {
+      // Werte unvollständig (z. B. Gewicht noch nie eingetragen) → Felder öffnen statt abhaken
+      state.editing = item.ex;
+      state.editHint = 'Erst die Werte eintragen und speichern, dann abhaken.';
+    }
     render();
   }
 
@@ -154,7 +160,7 @@ function exerciseRow(sessionId, item, entries, visibleIds = []) {
       }),
       h('div', { class: 'row-text' },
         h('div', { class: 'row-name' }, ex.name),
-        h('div', { class: 'row-values' }, formatEntry({ exercise: item.ex, ...values })),
+        ex.checkOnly ? null : h('div', { class: 'row-values' }, formatEntry({ exercise: item.ex, ...values })),
         ex.note ? h('div', { class: 'row-plan' }, ex.note) : null,
       ),
       editing ? null : h('button', { class: 'btn-text', onclick: () => { state.editing = item.ex; render(); } }, 'Ändern'),
@@ -163,11 +169,15 @@ function exerciseRow(sessionId, item, entries, visibleIds = []) {
   if (!editing) return row;
 
   const sets = numberField('Sätze', values.sets, 'numeric');
-  const reps = numberField(repsLabel(ex), formatNumber(values.reps), 'decimal');
-  const weight = ex.load === 'none' ? null : numberField(WEIGHT_LABEL[ex.load], formatNumber(values.weight), 'decimal');
-  const message = h('div', { class: 'error' });
+  const reps = numberField(repsLabel(ex), values.reps === null ? '' : formatNumber(values.reps), 'decimal');
+  const weight = ex.load === 'none' ? null
+    : numberField(WEIGHT_LABEL[ex.load], values.weight === null ? '' : formatNumber(values.weight), 'decimal');
+  const message = h('div', { class: 'error' }, state.editHint ?? '');
+  state.editHint = null;
   row.append(
     h('div', { class: 'edit' },
+      // Reine Abhak-Übung (z. B. Bauchmuskeln): keine Felder, nur Verschieben/Weglassen
+      ex.checkOnly ? h('button', { class: 'btn-secondary full', onclick: () => { state.editing = null; render(); } }, 'Schließen') : [
       h('div', { class: 'fields' }, sets.el, reps.el, weight?.el),
       message,
       h('div', { class: 'edit-actions' },
@@ -194,6 +204,7 @@ function exerciseRow(sessionId, item, entries, visibleIds = []) {
           },
         }, 'Speichern'),
       ),
+      ],
       // Nur selbst angelegte Übungen lassen sich aus dem Plan entfernen (die aus Gym.md nicht)
       // Reihenfolge ändern – wird gespeichert und gilt dauerhaft für diese Einheit
       h('div', { class: 'move-actions' },

@@ -18,12 +18,12 @@ const gym = (date, exercise, session) => ({ type: 'gym', date, exercise, session
 
 test('Gym: alles, teilweise, ausgefallen, offen', () => {
   const entries = [
-    ...['klimmzuege', 'schraegbank_kh', 'lat_pulldown', 'dips', 'schulterdruecken_kh', 'face_pull']
+    ...['klimmzuege', 'schraegbank_kh', 'lat_pulldown', 'dips', 'schulterdruecken_kh', 'face_pull', 'handgelenk_curls', 'reverse_handgelenk']
       .map((ex) => gym('2026-10-05', ex, 'oka')),
     gym('2026-10-07', 'dips', 'arme'),
   ];
   const today = '2026-10-09'; // Freitag
-  assert.equal(dayStatus(week[0], entries, today).gym.status, 'done');     // Mo 6/6
+  assert.equal(dayStatus(week[0], entries, today).gym.status, 'done');     // Mo 8/8
   const mi = dayStatus(week[2], entries, today).gym;
   assert.deepEqual([mi.status, mi.done, mi.total], ['partial', 1, 10]);     // Mi 1/10 (ohne Sprint)
   assert.equal(dayStatus(week[3], entries, today).gym.status, 'missed');   // Do nichts, vorbei
@@ -74,12 +74,12 @@ test('Einträge vom Typ "exercise" (eigene Übungen) zählen nicht als Training'
 test('"Nur heute weglassen": Übung zählt an dem Tag nicht, an anderen Tagen schon', async () => {
   const { entryDocId } = await import('../js/entries.js');
   const skip = { type: 'skip', date: '2026-10-05', session: 'oka', exercise: 'face_pull' };
-  const five = ['klimmzuege', 'schraegbank_kh', 'lat_pulldown', 'dips', 'schulterdruecken_kh'].map((ex) => gym('2026-10-05', ex, 'oka'));
+  const five = ['klimmzuege', 'schraegbank_kh', 'lat_pulldown', 'dips', 'schulterdruecken_kh', 'handgelenk_curls', 'reverse_handgelenk'].map((ex) => gym('2026-10-05', ex, 'oka'));
   const mo = dayStatus(week[0], [...five, skip], '2026-10-09').gym;
-  assert.deepEqual([mo.status, mo.done, mo.total], ['done', 5, 5], '5 von 5 = erledigt, Face Pull weggelassen');
+  assert.deepEqual([mo.status, mo.done, mo.total], ['done', 7, 7], '7 von 7 = erledigt, Face Pull weggelassen');
   const ohneSkip = dayStatus(week[0], five, '2026-10-09').gym;
-  assert.equal(ohneSkip.status, 'partial', 'ohne Weglassen wären es 5 von 6');
-  const allSkipped = ['klimmzuege', 'schraegbank_kh', 'lat_pulldown', 'dips', 'schulterdruecken_kh', 'face_pull']
+  assert.equal(ohneSkip.status, 'partial', 'ohne Weglassen wären es 7 von 8');
+  const allSkipped = ['klimmzuege', 'schraegbank_kh', 'lat_pulldown', 'dips', 'schulterdruecken_kh', 'face_pull', 'handgelenk_curls', 'reverse_handgelenk']
     .map((exercise) => ({ type: 'skip', date: '2026-10-08', session: 'oka', exercise }));
   assert.equal(dayStatus({ ...week[3], gym: 'oka' }, allSkipped, '2026-10-09').gym.status, 'skipped');
   assert.equal(entryDocId(skip), 'skip_2026-10-05_oka_face_pull');

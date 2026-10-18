@@ -41,6 +41,10 @@ export const EXERCISES = {
   back_extension:       { name: 'Back Extension 45°',            load: 'kg',   unit: 'Wdh' },
   nordic_curl:          { name: 'Nordic Curl',                   load: 'none', unit: 'Wdh', note: 'mit Band' },
   wadenheben_einbeinig: { name: 'Wadenheben einbeinig',          load: 'bw',   unit: 'Wdh', perSide: true },
+  handgelenk_curls:     { name: 'Handgelenk-Curls',              load: 'kg',   unit: 'Wdh' },
+  reverse_handgelenk:   { name: 'Reverse Handgelenk-Curls',      load: 'kg',   unit: 'Wdh' },
+  // checkOnly: nur abhaken, ohne Sätze/Wiederholungen/Gewicht
+  bauchmuskeln:         { name: 'Bauchmuskeln',                  load: 'none', unit: 'Wdh', checkOnly: true },
 };
 
 // Einheiten mit Planwerten. Texte (kg, Sätze, Wdh., Pause) 1:1 aus Gym.md;
@@ -50,6 +54,8 @@ export const EXERCISES = {
 // Abweichung von Gym.md (laut Jalil, 11.10.2026): Montag Lat Pulldown statt Langhantelrudern (Startwert
 // 70 kg wie Lat Pulldown eng – per "Ändern" anpassen), Dips direkt nach Klimmzügen,
 // Back Extension von Samstag auf Donnerstag.
+// Neuer Plan von Jalil (18.10.2026): Mo + Handgelenk-Curls und Reverse Handgelenk-Curls (Gewicht noch
+// offen – wird beim ersten Abhaken abgefragt), Do + Bauchmuskeln (nur abhaken).
 // Abweichung von Gym.md: Hammer Curls, Curls im Sitzen, Seitheben, Bulgarian Split Squat
 // sind laut Jalil pro Hand gemeint und daher als "2 × … kg" geführt.
 export const SESSIONS = {
@@ -62,6 +68,8 @@ export const SESSIONS = {
       { ex: 'lat_pulldown',        kg: '70 kg',      sets: '4', reps: '8–10',  pause: '2 min' },
       { ex: 'schulterdruecken_kh', kg: '2 × 12 kg',  sets: '3', reps: '8–10',  pause: '2 min', estimate: true },
       { ex: 'face_pull',           kg: '15 kg',      sets: '3', reps: '10–15', pause: '60 s',  estimate: true },
+      { ex: 'handgelenk_curls',    kg: 'eintragen',  sets: '3', reps: '12–15', pause: '60 s' },
+      { ex: 'reverse_handgelenk',  kg: 'eintragen',  sets: '3', reps: '12–15', pause: '60 s' },
     ],
   },
   arme: {
@@ -89,6 +97,7 @@ export const SESSIONS = {
       { ex: 'seitheben',            kg: '2 × 8 kg', sets: '3',     reps: '12–15', pause: '60 s' },
       { ex: 'reverse_butterfly',    kg: '54 kg',  sets: '3',     reps: '12–15', pause: '60 s' },
       { ex: 'back_extension',       kg: '15 kg',  sets: '3',     reps: '12–15', pause: '90 s' },
+      { ex: 'bauchmuskeln',         kg: '—',      sets: '—',     reps: '—',     pause: '—' },
     ],
   },
   uk: {

@@ -29,7 +29,12 @@ test('Jede Übung im Plan ergibt eine gültige Vorbelegung (Plan fehlerfrei lesb
     for (const item of session.items) {
       const d = defaultsFor(sessionId, item.ex, []);
       const errors = validateGym({ date: '2026-10-05', exercise: item.ex, ...d });
-      assert.deepEqual(errors, [], `${sessionId}/${item.ex}: ${errors.join(', ')}`);
+      if (item.kg === 'eintragen') {
+        // Gewicht im Plan noch offen → beim ersten Abhaken muss es eingetragen werden
+        assert.deepEqual(errors, ['Gewicht: Zahl größer 0'], `${sessionId}/${item.ex}`);
+      } else {
+        assert.deepEqual(errors, [], `${sessionId}/${item.ex}: ${errors.join(', ')}`);
+      }
     }
   }
 });
@@ -102,4 +107,18 @@ test('Per "Ändern" gespeicherte Werte gelten dauerhaft – auch nach Zurückneh
   const older = { type: 'gym', exercise: 'klimmzuege', date: '2026-10-01', createdAt: 'a', sets: 4, reps: 5, weight: 2.5 };
   assert.deepEqual(defaultsFor('oka', 'klimmzuege', [older, target]), { sets: 4, reps: 7, weight: 5 });
   assert.equal(entryDocId(target), 'target_klimmzuege');
+});
+
+test('Neuer Plan 18.10.: Handgelenk-Curls ohne Gewicht, Bauchmuskeln nur abhaken', async () => {
+  const { formatEntry, defaultsFor, validateGym } = await import('../js/entries.js');
+  const { SESSIONS } = await import('../js/plan.js');
+  assert.deepEqual(SESSIONS.oka.items.map((i) => i.ex).slice(-2), ['handgelenk_curls', 'reverse_handgelenk']);
+  assert.equal(SESSIONS.okb.items.at(-1).ex, 'bauchmuskeln');
+  // ohne Gewicht: Anzeige fordert zum Eintragen auf statt "null kg"
+  assert.equal(formatEntry({ exercise: 'handgelenk_curls', ...defaultsFor('oka', 'handgelenk_curls', []) }), '3 × 12 Wdh. · Gewicht eintragen');
+  // Bauchmuskeln: keine Werte, Abhaken ist gültig
+  const b = defaultsFor('okb', 'bauchmuskeln', []);
+  assert.deepEqual(b, { sets: null, reps: null, weight: null });
+  assert.deepEqual(validateGym({ date: '2026-10-22', exercise: 'bauchmuskeln', ...b }), []);
+  assert.equal(formatEntry({ exercise: 'bauchmuskeln', ...b }), '');
 });
